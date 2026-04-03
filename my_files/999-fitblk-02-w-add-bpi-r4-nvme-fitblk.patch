@@ -1,6 +1,6 @@
 --- a/drivers/block/fitblk.c
 +++ b/drivers/block/fitblk.c
-@@ -613,37 +613,70 @@
+@@ -613,37 +613,79 @@
  
  static int fitblk_match_of_node(struct device *dev, const void *np)
  {
@@ -14,12 +14,22 @@
  	/*
 -	 * To match ubiblock and mtdblock devices by their parent ubi
 -	 * or mtd device, also consider block device parent
-+	 * Only match partition block devices — whole disk devices do not
-+	 * contain a uImage.FIT directly and would cause parse errors.
++	 * ubiblock devices are not partitions but must be matched directly
++	 * against their OF node (MTD/UBI backed devices).
++	 * For all other devices, only match partitions to avoid false matches
++	 * on whole-disk devices (e.g. nvme0n1 instead of nvme0n1p2).
  	 */
 -	if (!dev->parent)
-+	if (!bdev_is_partition(dev_to_bdev(dev)))
++	if (!bdev_is_partition(dev_to_bdev(dev))) {
++		if (strncmp(dev_name(dev), "ubiblock", 8) != 0)
++			return 0;
++		/* ubiblock: match against device and its parent directly */
++		if (device_match_of_node(dev, np))
++			return 1;
++		if (dev->parent)
++			return device_match_of_node(dev->parent, np);
  		return 0;
++	}
  
 -	return device_match_of_node(dev->parent, np);
 +	/*
@@ -30,8 +40,7 @@
 +	 * and PCI bridge devices do not have OF nodes assigned, but the
 +	 * parent PCIe controller platform device (e.g. pcie@11290000) does.
 +	 *
-+	 * For MTD/UBI backed devices the existing single-level parent match
-+	 * is preserved as part of this loop.
++	 * For eMMC/SD devices the match is found at shallow depth.
 +	 */
 +	for (d = dev; d; d = d->parent) {
 +		if (device_match_of_node(d, np))
@@ -86,7 +95,7 @@
  	},
  };
  
-@@ -651,13 +684,19 @@
+@@ -651,13 +693,19 @@
  {
  	/* detect U-Boot firmware */
  	ubootver = of_get_property(of_chosen, "u-boot,version", NULL);
@@ -108,7 +117,7 @@
  
  	if (platform_driver_register(&fitblk_driver))
  		return -ENODEV;
-@@ -669,4 +708,4 @@
+@@ -669,4 +717,4 @@
  
  	return 0;
  }

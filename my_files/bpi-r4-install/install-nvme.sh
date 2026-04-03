@@ -250,7 +250,16 @@ fi
 sync
 printf "        OK -- rootfs written to p2\n\n"
 
-# || Set nvme_boot env and reboot |||||||||||||||||||||||||||||||||||||||||||||
+# || Set nvme_boot env ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+printf "        Setting U-Boot env for NVMe boot...\n"
+fw_setenv nvme_boot 1
+if [ $? -ne 0 ]; then
+    printf "${YELLOW}WARNING: fw_setenv failed -- set nvme_boot manually${NC}\n"
+else
+    printf "        OK -- nvme_boot=1 set\n"
+fi
+printf "\n"
 
 printf "${GREEN}=================================================${NC}\n"
 printf "${GREEN}  Installation complete!${NC}\n"
@@ -258,15 +267,13 @@ printf "${GREEN}=================================================${NC}\n"
 printf "\n"
 
 if [ "$INSTALL_TYPE" = "first" ]; then
-    printf "        Setting U-Boot env for NVMe boot...\n"
-    fw_setenv nvme_boot 1
-    printf "        Rebooting into NVMe system...\n"
-    printf "\n"
+    printf "  Rebooting into NVMe system...\n\n"
     sleep 2
     reboot
 else
-    printf "  Update done. Reboot to apply.\n"
-    printf "\n"
+    printf "  Rebooting...\n\n"
+    sleep 2
+    reboot
 fi
 
 # NOTE: Future — auto download from GitHub release:

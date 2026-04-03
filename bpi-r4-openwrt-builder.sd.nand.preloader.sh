@@ -40,7 +40,7 @@ chmod +x files/root/bpi-r4-install/install-nand.sh
 # Set hostname for rescue system
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-hostname << 'EOF'
-uci set system.@system[0].hostname='BPI-R4-SD-NAND-NVMe-Preloader'
+uci set system.@system[0].hostname='BPI-R4-rescue-SD'
 uci commit system
 EOF
 

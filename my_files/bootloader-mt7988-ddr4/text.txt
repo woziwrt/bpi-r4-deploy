@@ -1,0 +1,19 @@
+ipsec@ipsec-VMware-Virtual-Platform:~$ strings /home/ipsec/bpi-r4-openwrt-builder/openwrt/build_dir/target-aarch64_cortex-a53_musl/arm-trusted-firmware-mediatek-mt7988-spim-nand-ddr4/arm-trusted-firmware-mediatek-2026.01.23~e06f2586/plat/mediatek/mt7988/drivers/dram/release/dram.a | grep -i "ddr4\|ddr3"
+mt7988_use_ddr4
+mt7988_ddr4_4bg_mode
+mt7988_ddr4_freq
+mt7988_ddr3_freq
+mt7988_use_ddr4
+mt7988_ddr4_4bg_mode
+mt7988_ddr4_freq
+mt7988_ddr3_freq
+.rela.text.DRM_DDR34_SWZQ
+.rodata.ImpPCDDR3VrefSel
+.rodata.ImpPCDDR4VrefSel
+.rodata.ACTimingTbl_DDR4
+.rodata.ACTimingTbl_DDR3
+.bss.mt7988_ddr4_freq
+.bss.mt7988_ddr3_freq
+.bss.mt7988_ddr4_4bg_mode
+.bss.mt7988_use_ddr4
+ipsec@ipsec-VMware-Virtual-Platform:~$

@@ -4,11 +4,9 @@ set -euo pipefail
 rm -rf openwrt
 rm -rf mtk-openwrt-feeds
 
-git clone --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt
-cd openwrt; git checkout 12e56ac8d4bc056768c962796f55531a6da2b4cf; cd -;		
+tar -xzf repo-cache/openwrt.tar.gz --strip-components=1 -C . --one-top-level=openwrt
+tar -xzf repo-cache/mtk-openwrt-feeds.tar.gz --strip-components=1 -C . --one-top-level=mtk-openwrt-feeds
 
-git clone --branch master https://git01.mediatek.com/openwrt/feeds/mtk-openwrt-feeds
-cd mtk-openwrt-feeds; git checkout 14dc256bd536382ea427712eb3896e669beeae71; cd -;	
 
 #\cp -r my_files/feed_revision mtk-openwrt-feeds/autobuild/unified/
 

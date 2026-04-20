@@ -1,0 +1,224 @@
+name: Build BPI-R4 Deploy Cached
+
+on:
+  workflow_dispatch:
+    inputs:
+      ram:
+        description: 'RAM variant'
+        required: true
+        default: '4gb'
+        type: choice
+        options:
+          - 4gb
+          - 8gb
+      variant:
+        description: 'Build variant'
+        required: true
+        default: 'standard'
+        type: choice
+        options:
+          - standard
+          - wired
+      repo_commit:
+        description: 'Commit hash of this repository (leave empty for latest)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  OPENWRT_COMMIT: "12e56ac8d4bc056768c962796f55531a6da2b4cf"
+  MTK_COMMIT: "14dc256bd536382ea427712eb3896e669beeae71"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.repo_commit || github.sha }}
+
+      - name: Set build variables
+        run: |
+          RAM="${{ github.event.inputs.ram }}"
+          VARIANT="${{ github.event.inputs.variant }}"
+          echo "BUILDER=./builder-${RAM}-${VARIANT}.sh" >> $GITHUB_ENV
+          echo "RELEASE_TAG_NONPOE=release-${RAM}-${VARIANT}-non-poe" >> $GITHUB_ENV
+          echo "RELEASE_TAG_POE=release-${RAM}-${VARIANT}-poe" >> $GITHUB_ENV
+          echo "RELEASE_NAME_NONPOE=BPI-R4 ${RAM} ${VARIANT} non-poe (latest)" >> $GITHUB_ENV
+          echo "RELEASE_NAME_POE=BPI-R4 ${RAM} ${VARIANT} poe (latest)" >> $GITHUB_ENV
+
+      - name: Delete existing releases and tags
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const tags = [process.env.RELEASE_TAG_NONPOE, process.env.RELEASE_TAG_POE];
+
+            const releases = await github.rest.repos.listReleases({
+              owner,
+              repo,
+              per_page: 100
+            });
+
+            for (const tag of tags) {
+              for (const rel of releases.data) {
+                if (rel.tag_name === tag) {
+                  await github.rest.repos.deleteRelease({
+                    owner,
+                    repo,
+                    release_id: rel.id
+                  }).catch(e => console.log(`Failed to delete release ${rel.id}: ${e.message}`));
+                }
+              }
+              await github.rest.git.deleteRef({
+                owner,
+                repo,
+                ref: `tags/${tag}`
+              }).catch(e => console.log(`Failed to delete tag ${tag}: ${e.message}`));
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Free disk space on runner
+        run: |
+          sudo rm -rf \
+            "$AGENT_TOOLSDIRECTORY" \
+            /opt/ghc \
+            /opt/google/chrome \
+            /opt/microsoft/msedge \
+            /opt/microsoft/powershell \
+            /opt/pipx \
+            /usr/lib/mono \
+            /usr/local/julia* \
+            /usr/local/lib/android \
+            /usr/local/lib/node_modules \
+            /usr/local/share/chromium \
+            /usr/local/share/powershell \
+            /usr/share/dotnet \
+            /usr/share/swift
+          df -h
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+            gettext libncurses-dev libssl-dev python3-distutils python3-setuptools \
+            rsync swig unzip zlib1g-dev file wget libelf-dev ccache git
+
+      - name: Restore repository cache
+        id: cache-repos
+        uses: actions/cache@v4
+        with:
+          path: |
+            repo-cache/openwrt.tar.gz
+            repo-cache/mtk-openwrt-feeds.tar.gz
+          key: repos-${{ env.OPENWRT_COMMIT }}-${{ env.MTK_COMMIT }}
+
+      - name: Clone and cache repositories
+        if: steps.cache-repos.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p repo-cache
+
+          git clone --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt-clone
+          cd openwrt-clone && git checkout ${{ env.OPENWRT_COMMIT }} && cd ..
+          tar -czf repo-cache/openwrt.tar.gz openwrt-clone
+          rm -rf openwrt-clone
+
+          git clone --branch master https://git01.mediatek.com/openwrt/feeds/mtk-openwrt-feeds mtk-clone
+          cd mtk-clone && git checkout ${{ env.MTK_COMMIT }} && cd ..
+          tar -czf repo-cache/mtk-openwrt-feeds.tar.gz mtk-clone
+          rm -rf mtk-clone
+
+      - name: Run builder script
+        run: |
+          chmod +x ${{ env.BUILDER }}
+          ${{ env.BUILDER }}
+        env:
+          OPENWRT_COMMIT: ${{ env.OPENWRT_COMMIT }}
+          MTK_COMMIT: ${{ env.MTK_COMMIT }}
+
+      - name: Prepare non-poe artifacts
+        run: |
+          RAM="${{ github.event.inputs.ram }}"
+          FILOGIC="openwrt/bin/targets/mediatek/filogic"
+          mkdir -p artifacts-non-poe
+
+          if [ "$RAM" = "8gb" ]; then
+            cp rescue/bpi-r4-rescue-sdcard.8gb.img.gz artifacts-non-poe/
+          else
+            cp rescue/bpi-r4-rescue-sdcard.img.gz artifacts-non-poe/
+          fi
+
+          cp ${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-squashfs-sysupgrade.itb artifacts-non-poe/bpi-r4.itb
+          cp ${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-nvme-img.bin artifacts-non-poe/
+          cp ${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-sdcard.img.gz artifacts-non-poe/
+          cp ${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-emmc-img.bin artifacts-non-poe/
+          cp ${FILOGIC}/config.buildinfo artifacts-non-poe/
+
+          cd artifacts-non-poe
+          sha256sum \
+            openwrt-mediatek-filogic-bananapi_bpi-r4-nvme-img.bin \
+            openwrt-mediatek-filogic-bananapi_bpi-r4-sdcard.img.gz \
+            openwrt-mediatek-filogic-bananapi_bpi-r4-emmc-img.bin \
+            bpi-r4.itb \
+            > sha256sums
+
+      - name: Prepare poe artifacts
+        run: |
+          RAM="${{ github.event.inputs.ram }}"
+          FILOGIC="openwrt/bin/targets/mediatek/filogic"
+          mkdir -p artifacts-poe
+
+          if [ "$RAM" = "8gb" ]; then
+            cp rescue/bpi-r4-rescue-sdcard.8gb.img.gz artifacts-poe/
+          else
+            cp rescue/bpi-r4-rescue-sdcard.img.gz artifacts-poe/
+          fi
+
+          cp ${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-poe-squashfs-sysupgrade.itb artifacts-poe/bpi-r4-poe.itb
+          cp ${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-poe-nvme-img.bin artifacts-poe/
+          cp ${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-poe-sdcard.img.gz artifacts-poe/
+          cp ${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-poe-emmc-img.bin artifacts-poe/
+          cp ${FILOGIC}/config.buildinfo artifacts-poe/
+
+          cd artifacts-poe
+          sha256sum \
+            openwrt-mediatek-filogic-bananapi_bpi-r4-poe-nvme-img.bin \
+            openwrt-mediatek-filogic-bananapi_bpi-r4-poe-sdcard.img.gz \
+            openwrt-mediatek-filogic-bananapi_bpi-r4-poe-emmc-img.bin \
+            bpi-r4-poe.itb \
+            > sha256sums
+
+      - name: Create non-poe release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG_NONPOE }}
+          name: ${{ env.RELEASE_NAME_NONPOE }}
+          body: |
+            RAM: ${{ github.event.inputs.ram }}
+            Variant: ${{ github.event.inputs.variant }}
+            Target: non-poe
+            Repository commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: artifacts-non-poe/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create poe release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG_POE }}
+          name: ${{ env.RELEASE_NAME_POE }}
+          body: |
+            RAM: ${{ github.event.inputs.ram }}
+            Variant: ${{ github.event.inputs.variant }}
+            Target: poe
+            Repository commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: artifacts-poe/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -694,25 +694,25 @@ mt7988a-bananapi-bpi-r4-nvme
       snand-preloader.bin snand-bl31-uboot.fip \
       snand-img.bin
   ARTIFACT/emmc-gpt.bin := mt798x-gpt emmc
-  ARTIFACT/emmc-preloader.bin := mt7988-bl2 emmc-ddr4
+  ARTIFACT/emmc-preloader.bin := mt7988-bl2 emmc-comb-8g
   ARTIFACT/emmc-bl31-uboot.fip := mt7988-bl31-uboot $$(DEVICE_NAME)-emmc
   ARTIFACT/emmc-img.bin := mt798x-gpt emmc | \
-  pad-to 17k | mt7988-bl2 emmc-ddr4 | \
+  pad-to 17k | mt7988-bl2 emmc-comb-8g | \
   pad-to 6656k | mt7988-bl31-uboot $$(DEVICE_NAME)-emmc | \
   pad-to 64M | append-image squashfs-sysupgrade.itb
   ARTIFACT/nvme-img.bin := mt798x-gpt-nvme | \
   pad-to 512M | append-image squashfs-sysupgrade.itb
-  ARTIFACT/snand-preloader.bin := mt7988-bl2 spim-nand-ddr4
+  ARTIFACT/snand-preloader.bin := mt7988-bl2 spim-nand-comb-8g
   ARTIFACT/snand-bl31-uboot.fip := mt7988-bl31-uboot $$(DEVICE_NAME)-snand
-  ARTIFACT/snand-img.bin := mt7988-bl2 spim-nand-ddr4 | \
+  ARTIFACT/snand-img.bin := mt7988-bl2 spim-nand-comb-8g | \
   pad-to 2048k | \
   ubinize-image fit squashfs-sysupgrade.itb
   ARTIFACT/sdcard.img.gz := mt798x-gpt sdmmc |\
-  pad-to 17k | mt7988-bl2 sdmmc-ddr4 |\
+  pad-to 17k | mt7988-bl2 sdmmc-comb-8g |\
   pad-to 6656k | mt7988-bl31-uboot $$(DEVICE_NAME)-sdmmc |\
-  pad-to 44M | mt7988-bl2 spim-nand-ddr4 |\
+  pad-to 44M | mt7988-bl2 spim-nand-comb-8g |\
   pad-to 45M | mt7988-bl31-uboot $$(DEVICE_NAME)-snand |\
-  pad-to 51M | mt7988-bl2 emmc-ddr4 |\
+  pad-to 51M | mt7988-bl2 emmc-comb-8g |\
   pad-to 52M | mt7988-bl31-uboot $$(DEVICE_NAME)-emmc |\
   pad-to 56M | mt798x-gpt emmc |\
 $(if $(CONFIG_TARGET_ROOTFS_SQUASHFS),\

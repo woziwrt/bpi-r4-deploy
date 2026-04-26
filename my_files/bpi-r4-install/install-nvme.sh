@@ -1,5 +1,5 @@
 #!/bin/sh
-# install-nvme.sh — BPI-R4 NVMe install script
+# install-nvme.sh - BPI-R4 NVMe install script
 # Run from NAND rescue system
 
 NVME_DEV="/dev/nvme0n1"
@@ -225,10 +225,10 @@ case "$USE_LOCAL" in
         printf "        Checking release availability...\n"
         HTTP_CODE=$(wget --server-response --spider "$ITB_URL" 2>&1 | grep "HTTP/" | tail -1 | awk "{print \$2}")
         if [ "$HTTP_CODE" != "200" ]; then
-            printf "\n${RED}ERROR: Release not found on GitHub.${NC}\n"
+            printf "\n${RED}ERROR: Release not found on GitHub.\n"
             printf "       The build has not been created yet.\n"
             printf "       Please run the GitHub Actions workflow first:\n"
-            printf "       https://github.com/${GH_USER}/${GH_REPO}/actions\n\n"
+            printf "       https://github.com/${GH_USER}/${GH_REPO}/actions\n\n${NC}"
             exit 1
         fi
         printf "        OK -- release available\n\n"
@@ -286,6 +286,21 @@ if [ $? -ne 0 ]; then
 fi
 sync
 partprobe "$NVME_DEV" 2>/dev/null
+sleep 2
+printf "        OK\n\n"
+
+# Repartition: nvme-img.bin defines p1=63MB, p2=448MB which is too small for
+# the full ITB (113MB+). Delete p1 and p2 and recreate with correct sizes:
+#   p1 (boot):       2048  - 526335  = 256MB  (ext4, holds bpi-r4.itb)
+#   p2 (production): 526336 - 1576959 = 512MB  (raw FIT rootfs)
+#   p3 (data):       1576960 - end    = remainder
+# p128 (BIOS boot) at sectors 34-2047 is preserved by nvme-img.bin and
+# not touched here.
+printf "        Repartitioning for full image (p1=256MB, p2=512MB)...\n"
+sgdisk -d 1 -d 2 /dev/nvme0n1
+sgdisk -n 1:2048:526335   -t 1:8300 -c 1:boot       /dev/nvme0n1
+sgdisk -n 2:526336:1576959 -t 2:FFFF -c 2:production /dev/nvme0n1
+partprobe /dev/nvme0n1
 sleep 2
 printf "        OK\n\n"
 

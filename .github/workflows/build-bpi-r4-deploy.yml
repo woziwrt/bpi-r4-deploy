@@ -3,14 +3,6 @@ name: Build BPI-R4 Deploy
 on:
   workflow_dispatch:
     inputs:
-      ram:
-        description: 'RAM variant'
-        required: true
-        default: '4gb'
-        type: choice
-        options:
-          - 4gb
-          - 8gb
       variant:
         description: 'Build variant'
         required: true
@@ -19,14 +11,6 @@ on:
         options:
           - standard
           - wired
-      target:
-        description: 'Board target'
-        required: true
-        default: 'non-poe'
-        type: choice
-        options:
-          - non-poe
-          - poe
       repo_commit:
         description: 'Commit hash of this repository (leave empty for latest)'
         required: false
@@ -37,6 +21,8 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  OPENWRT_COMMIT: "12e56ac8d4bc056768c962796f55531a6da2b4cf"
+  MTK_COMMIT: "14dc256bd536382ea427712eb3896e669beeae71"
 
 jobs:
   build:
@@ -50,19 +36,22 @@ jobs:
 
       - name: Set build variables
         run: |
-          RAM="${{ github.event.inputs.ram }}"
           VARIANT="${{ github.event.inputs.variant }}"
-          TARGET="${{ github.event.inputs.target }}"
-          echo "BUILDER=./builder-${RAM}-${VARIANT}.sh" >> $GITHUB_ENV
-          echo "RELEASE_TAG=release-${RAM}-${VARIANT}-${TARGET}" >> $GITHUB_ENV
-          echo "RELEASE_NAME=BPI-R4 ${RAM} ${VARIANT} ${TARGET} (latest)" >> $GITHUB_ENV
 
-      - name: Delete existing release and tag
+          if [ "$VARIANT" = "wired" ]; then
+            echo "BUILDER=./builder-wired-universal.sh" >> $GITHUB_ENV
+            echo "RELEASE_TAGS=release-4gb-wired release-4gb-poe-wired release-8gb-wired release-8gb-poe-wired release-8gb-wired-unifi release-8gb-poe-wired-unifi" >> $GITHUB_ENV
+          else
+            echo "BUILDER=./builder-universal.sh" >> $GITHUB_ENV
+            echo "RELEASE_TAGS=release-4gb-standard release-4gb-poe release-8gb-standard release-8gb-poe" >> $GITHUB_ENV
+          fi
+
+      - name: Delete existing releases and tags
         uses: actions/github-script@v7
         with:
           script: |
             const { owner, repo } = context.repo;
-            const tag = process.env.RELEASE_TAG;
+            const tags = process.env.RELEASE_TAGS.split(' ');
 
             const releases = await github.rest.repos.listReleases({
               owner,
@@ -70,21 +59,22 @@ jobs:
               per_page: 100
             });
 
-            for (const rel of releases.data) {
-              if (rel.tag_name === tag) {
-                await github.rest.repos.deleteRelease({
-                  owner,
-                  repo,
-                  release_id: rel.id
-                }).catch(e => console.log(`Failed to delete release ${rel.id}: ${e.message}`));
+            for (const tag of tags) {
+              for (const rel of releases.data) {
+                if (rel.tag_name === tag) {
+                  await github.rest.repos.deleteRelease({
+                    owner,
+                    repo,
+                    release_id: rel.id
+                  }).catch(e => console.log(`Failed to delete release ${rel.id}: ${e.message}`));
+                }
               }
+              await github.rest.git.deleteRef({
+                owner,
+                repo,
+                ref: `tags/${tag}`
+              }).catch(e => console.log(`Failed to delete tag ${tag}: ${e.message}`));
             }
-
-            await github.rest.git.deleteRef({
-              owner,
-              repo,
-              ref: `tags/${tag}`
-            }).catch(e => console.log(`Failed to delete tag ${tag}: ${e.message}`));
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -115,60 +105,234 @@ jobs:
             gettext libncurses-dev libssl-dev python3-distutils python3-setuptools \
             rsync swig unzip zlib1g-dev file wget libelf-dev ccache git
 
+      - name: Restore repository cache
+        id: cache-repos
+        uses: actions/cache@v4
+        with:
+          path: |
+            repo-cache/openwrt.tar.gz
+            repo-cache/mtk-openwrt-feeds.tar.gz
+          key: repos-${{ env.OPENWRT_COMMIT }}-${{ env.MTK_COMMIT }}
+
+      - name: Clone and cache repositories
+        if: steps.cache-repos.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p repo-cache
+
+          git clone --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt-clone
+          cd openwrt-clone && git checkout ${{ env.OPENWRT_COMMIT }} && cd ..
+          tar -czf repo-cache/openwrt.tar.gz openwrt-clone
+          rm -rf openwrt-clone
+
+          git clone --branch master https://git01.mediatek.com/openwrt/feeds/mtk-openwrt-feeds mtk-clone
+          cd mtk-clone && git checkout ${{ env.MTK_COMMIT }} && cd ..
+          tar -czf repo-cache/mtk-openwrt-feeds.tar.gz mtk-clone
+          rm -rf mtk-clone
+
       - name: Run builder script
         run: |
           chmod +x ${{ env.BUILDER }}
           ${{ env.BUILDER }}
+        env:
+          OPENWRT_COMMIT: ${{ env.OPENWRT_COMMIT }}
+          MTK_COMMIT: ${{ env.MTK_COMMIT }}
 
-      - name: Prepare artifacts
+      - name: Prepare release artifacts
         run: |
-          RAM="${{ github.event.inputs.ram }}"
-          TARGET="${{ github.event.inputs.target }}"
+          VARIANT="${{ github.event.inputs.variant }}"
           FILOGIC="openwrt/bin/targets/mediatek/filogic"
 
-          mkdir -p artifacts
+          # Prepare artifact directory for one release tag
+          # Args: dir, itb_src, itb_dst, nvme, sdcard, emmc, snand
+          make_release_dir() {
+            local DIR="$1"
+            local ITB_SRC="$2"
+            local ITB_DST="$3"
+            local NVME="$4"
+            local SDCARD="$5"
+            local EMMC="$6"
+            local SNAND="$7"
 
-          # Select correct rescue image
-          if [ "$RAM" = "8gb" ]; then
-            cp rescue/bpi-r4-rescue-sdcard.8gb.img.gz artifacts/
-          else
-            cp rescue/bpi-r4-rescue-sdcard.img.gz artifacts/
+            mkdir -p "$DIR"
+            cp "${FILOGIC}/${ITB_SRC}"   "${DIR}/${ITB_DST}"
+            cp "${FILOGIC}/${NVME}"      "${DIR}/${NVME}"
+            cp "${FILOGIC}/${SDCARD}"    "${DIR}/${SDCARD}"
+            cp "${FILOGIC}/${EMMC}"      "${DIR}/${EMMC}"
+            cp "${FILOGIC}/${SNAND}"     "${DIR}/${SNAND}"
+            cp "${FILOGIC}/config.buildinfo" "${DIR}/"
+            cd "$DIR"
+            sha256sum "${ITB_DST}" "${NVME}" "${SDCARD}" "${EMMC}" "${SNAND}" > sha256sums
+            cd ..
+          }
+
+          # 4GB non-poe
+          make_release_dir rel-4gb \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-squashfs-sysupgrade.itb" \
+            "bpi-r4.itb" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-nvme-img.bin" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-sdcard.img.gz" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-emmc-img.bin" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-snand-img.bin"
+
+          # 4GB PoE
+          make_release_dir rel-4gb-poe \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-squashfs-sysupgrade.itb" \
+            "bpi-r4-poe.itb" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-nvme-img.bin" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-sdcard.img.gz" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-emmc-img.bin" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-snand-img.bin"
+
+          # 8GB non-poe
+          make_release_dir rel-8gb \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-squashfs-sysupgrade.itb" \
+            "bpi-r4.itb" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-nvme-img.bin" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-sdcard.img.gz" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-emmc-img.bin" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-snand-img.bin"
+
+          # 8GB PoE
+          make_release_dir rel-8gb-poe \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-squashfs-sysupgrade.itb" \
+            "bpi-r4-poe.itb" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-nvme-img.bin" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-sdcard.img.gz" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-emmc-img.bin" \
+            "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-snand-img.bin"
+
+          # UniFi variants = same artifacts as 8gb wired, separate tags
+          if [ "$VARIANT" = "wired" ]; then
+            cp -r rel-8gb     rel-8gb-unifi
+            cp -r rel-8gb-poe rel-8gb-poe-unifi
           fi
 
-          # Select correct target artifacts
-          if [ "$TARGET" = "poe" ]; then
-            PREFIX="bananapi_bpi-r4-poe"
-            ITB="bpi-r4-poe.itb"
-          else
-            PREFIX="bananapi_bpi-r4"
-            ITB="bpi-r4.itb"
-          fi
-
-          cp ${FILOGIC}/openwrt-mediatek-filogic-${PREFIX}-squashfs-sysupgrade.itb artifacts/${ITB}
-          cp ${FILOGIC}/openwrt-mediatek-filogic-${PREFIX}-nvme-img.bin artifacts/
-          cp ${FILOGIC}/openwrt-mediatek-filogic-${PREFIX}-sdcard.img.gz artifacts/
-          cp ${FILOGIC}/openwrt-mediatek-filogic-${PREFIX}-emmc-img.bin artifacts/
-          cp ${FILOGIC}/config.buildinfo artifacts/
-
-          # Generate sha256sums
-          cd artifacts
-          sha256sum \
-            openwrt-mediatek-filogic-${PREFIX}-nvme-img.bin \
-            openwrt-mediatek-filogic-${PREFIX}-sdcard.img.gz \
-            openwrt-mediatek-filogic-${PREFIX}-emmc-img.bin \
-            ${ITB} \
-            > sha256sums
-
-      - name: Create release
+      - name: Publish release-4gb-standard
+        if: github.event.inputs.variant == 'standard'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: ${{ env.RELEASE_NAME }}
+          tag_name: release-4gb-standard
+          name: "BPI-R4 4GB standard WiFi (latest)"
           body: |
-            RAM: ${{ github.event.inputs.ram }}
-            Variant: ${{ github.event.inputs.variant }}
-            Target: ${{ github.event.inputs.target }}
-            Repository commit: ${{ github.event.inputs.repo_commit || github.sha }}
-          files: artifacts/*
+            Variant: standard (WiFi) | RAM: 4GB
+            Commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: rel-4gb/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release-4gb-poe
+        if: github.event.inputs.variant == 'standard'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-4gb-poe
+          name: "BPI-R4 4GB PoE WiFi (latest)"
+          body: |
+            Variant: standard (WiFi) | RAM: 4GB | PoE
+            Commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: rel-4gb-poe/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release-8gb-standard
+        if: github.event.inputs.variant == 'standard'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-8gb-standard
+          name: "BPI-R4 8GB standard WiFi (latest)"
+          body: |
+            Variant: standard (WiFi) | RAM: 8GB
+            Commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: rel-8gb/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release-8gb-poe
+        if: github.event.inputs.variant == 'standard'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-8gb-poe
+          name: "BPI-R4 8GB PoE WiFi (latest)"
+          body: |
+            Variant: standard (WiFi) | RAM: 8GB | PoE
+            Commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: rel-8gb-poe/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release-4gb-wired
+        if: github.event.inputs.variant == 'wired'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-4gb-wired
+          name: "BPI-R4 4GB wired (latest)"
+          body: |
+            Variant: wired (no WiFi) | RAM: 4GB
+            Commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: rel-4gb/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release-4gb-poe-wired
+        if: github.event.inputs.variant == 'wired'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-4gb-poe-wired
+          name: "BPI-R4 4GB PoE wired (latest)"
+          body: |
+            Variant: wired (no WiFi) | RAM: 4GB | PoE
+            Commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: rel-4gb-poe/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release-8gb-wired
+        if: github.event.inputs.variant == 'wired'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-8gb-wired
+          name: "BPI-R4 8GB wired (latest)"
+          body: |
+            Variant: wired (no WiFi) | RAM: 8GB
+            Commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: rel-8gb/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release-8gb-poe-wired
+        if: github.event.inputs.variant == 'wired'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-8gb-poe-wired
+          name: "BPI-R4 8GB PoE wired (latest)"
+          body: |
+            Variant: wired (no WiFi) | RAM: 8GB | PoE
+            Commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: rel-8gb-poe/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release-8gb-wired-unifi
+        if: github.event.inputs.variant == 'wired'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-8gb-wired-unifi
+          name: "BPI-R4 8GB wired UniFi (latest)"
+          body: |
+            Variant: wired (no WiFi) | RAM: 8GB | UniFi stack
+            Commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: rel-8gb-unifi/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release-8gb-poe-wired-unifi
+        if: github.event.inputs.variant == 'wired'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-8gb-poe-wired-unifi
+          name: "BPI-R4 8GB PoE wired UniFi (latest)"
+          body: |
+            Variant: wired (no WiFi) | RAM: 8GB | PoE | UniFi stack
+            Commit: ${{ github.event.inputs.repo_commit || github.sha }}
+          files: rel-8gb-poe-unifi/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

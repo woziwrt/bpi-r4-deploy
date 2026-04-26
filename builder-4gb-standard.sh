@@ -4,18 +4,14 @@ set -euo pipefail
 rm -rf openwrt
 rm -rf mtk-openwrt-feeds
 
-tar -xzf repo-cache/openwrt.tar.gz --strip-components=1 -C . --one-top-level=openwrt
-tar -xzf repo-cache/mtk-openwrt-feeds.tar.gz --strip-components=1 -C . --one-top-level=mtk-openwrt-feeds
+git clone --branch openwrt-25.12 https://git.openwrt.org/openwrt/openwrt.git openwrt
+cd openwrt; git checkout 6cbb072b57e9d72d07097902d975f8a13b768e72; cd -;	#qualcommax: ipq50xx: ax6000: enable pcie1 for QCA9887	
 
+tar xzf /home/ipsec/mtk-feeds-cache.tar.gz
 
 #\cp -r my_files/feed_revision mtk-openwrt-feeds/autobuild/unified/
 
 \cp -r my_files/999-sfp-10-additional-quirks.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
-
-### tx_power check Ivan Mironov's patch - for defective BE14 boards with defective eeprom flash
-\cp -r my_files/100-wifi-mt76-mt7996-Use-tx_power-from-default-fw-if-EEP.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches
-
-#\cp -r my_files/999-w-image-bpi-r4-nvme-ddr4.patch mtk-openwrt-feeds/25.12/patches-base/
 
 cd openwrt
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic prepare
@@ -26,7 +22,7 @@ bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x
 \cp -r ../my_files/451-w-add-bpi-r4-nvme.patch package/boot/uboot-mediatek/patches/451-add-bpi-r4-nvme.patch
 \cp ../my_files/452-w-add-bpi-r4-nvme-rfb.patch package/boot/uboot-mediatek/patches/452-add-bpi-r4-nvme-rfb.patch
 \cp ../my_files/454-w-add-bpi-r4-nvme-env.patch package/boot/uboot-mediatek/patches/454-add-bpi-r4-nvme-env.patch
-\cp -r ../my_files/w-sd-nand-mmc-nvme-comb-filogic.mk target/linux/mediatek/image/filogic.mk
+\cp -r ../my_files/w-sd-nand-mmc-nvme-filogic.mk target/linux/mediatek/image/filogic.mk
 
 echo "CONFIG_BLK_DEV_NVME=y" >> target/linux/mediatek/filogic/config-6.12
 
@@ -53,7 +49,7 @@ chmod -R 755 feeds/luci/applications/luci-app-modemdata/root
 chmod -R 755 feeds/luci/applications/luci-app-sms-tool-js/root
 chmod -R 755 feeds/packages/utils/modemdata/files/usr/share
 
-\cp -r ../configs/my_defconfig-standard .config
+\cp -r ../configs/my_defconfig-4gb-standard .config
 make defconfig
 
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic build

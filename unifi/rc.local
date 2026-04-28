@@ -1,0 +1,47 @@
+#!/bin/sh
+# rc.local — BPI-R4 UniFi Protect autostart
+# Installed automatically by unifi-setup.sh
+# Runs on every boot after first setup
+
+# Only run if unifi-setup.sh has been completed
+if [ ! -f /mnt/nvme0n1p3/.unifi-setup-done ]; then
+    exit 0
+fi
+
+ENP0S2_MAC="00:50:43:ba:d0:01"
+ENP0S2_IP="192.168.1.1/24"
+ENP0S2_GW="192.168.1.1"
+LAN_BRIDGE="br-lan"
+COMPOSE_FILE="/mnt/nvme0n1p3/unifi-protect/docker-compose.yml"
+
+# enp0s2 — macvlan over br-lan
+# CRITICAL: must be macvlan (not dummy) for carrier/green interface
+# and camera auto-discovery via UDP port 10001
+modprobe dummy
+
+ip link del enp0s2 2>/dev/null || true
+ip link add enp0s2 link $LAN_BRIDGE type macvlan mode bridge
+ip link set enp0s2 address $ENP0S2_MAC
+ip addr add $ENP0S2_IP dev enp0s2
+ip link set enp0s2 up
+ip route add default via $ENP0S2_GW dev enp0s2 2>/dev/null || true
+
+# enp0s1 — dummy secondary interface to mimic real UNVR hardware
+ip link del enp0s1 2>/dev/null || true
+ip link add enp0s1 type dummy
+ip link set enp0s1 up
+
+# Start UniFi Protect
+docker-compose -f $COMPOSE_FILE up -d
+
+# CRITICAL: inject default route inside container after startup
+# network_mode: host does not inherit routes added after container start
+sleep 30
+docker exec unifi-protect ip route add default via $ENP0S2_GW dev enp0s2 2>/dev/null || true
+docker exec unifi-protect systemctl restart unifi-core
+
+# Start UniFi Network Application after Protect is fully up
+# sleep 120: wait for Protect + nft to be fully initialized before starting Network
+(sleep 120 && /mnt/nvme0n1p3/rc-network.sh) &
+
+exit 0

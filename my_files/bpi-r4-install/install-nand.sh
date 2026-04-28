@@ -5,12 +5,38 @@
 set -e
 
 INSTALL_DIR="/root/bpi-r4-install"
-NAND_IMG="${INSTALL_DIR}/snand-img.bin"
 
 echo ""
 echo "=================================================="
 echo "  BPI-R4 - Install rescue system to NAND"
 echo "=================================================="
+echo ""
+
+# RAM variant selection
+echo "Select your board RAM variant:"
+echo "  1) 4GB"
+echo "  2) 8GB  (required for UniFi stack)"
+echo ""
+printf "Enter choice [1-2]: "
+read RAM_CHOICE
+
+case "${RAM_CHOICE}" in
+    1)
+        NAND_IMG="${INSTALL_DIR}/.snand-img-4gb.bin"
+        RAM_LABEL="4GB"
+        ;;
+    2)
+        NAND_IMG="${INSTALL_DIR}/.snand-img-8gb.bin"
+        RAM_LABEL="8GB"
+        ;;
+    *)
+        echo "ERROR: Invalid choice!"
+        exit 1
+        ;;
+esac
+
+echo ""
+echo "Selected: ${RAM_LABEL} variant"
 echo ""
 
 # Verify we are running from SD card
@@ -23,14 +49,14 @@ fi
 echo "OK: System is running from SD card."
 echo ""
 
-# Verify snand-img.bin exists
+# Verify image exists
 if [ ! -f "${NAND_IMG}" ]; then
-    echo "ERROR: File ${NAND_IMG} not found!"
-    echo "       Copy snand-img.bin to ${INSTALL_DIR}/"
+    echo "ERROR: Image file not found!"
+    echo "       SD rescue image may be incomplete."
     exit 1
 fi
 
-echo "OK: snand-img.bin found ($(du -h ${NAND_IMG} | cut -f1))."
+echo "OK: ${RAM_LABEL} image found ($(du -h ${NAND_IMG} | cut -f1))."
 echo ""
 
 # Verify NAND device is available
@@ -48,7 +74,7 @@ echo "         Press ENTER to continue or CTRL+C to cancel."
 read _
 
 echo ""
-echo "Flashing snand-img.bin to NAND..."
+echo "Flashing ${RAM_LABEL} rescue image to NAND..."
 mtd -e spi0.0 write "${NAND_IMG}" spi0.0
 
 echo ""

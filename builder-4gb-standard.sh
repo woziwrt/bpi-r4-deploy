@@ -5,9 +5,10 @@ rm -rf openwrt
 rm -rf mtk-openwrt-feeds
 
 git clone --branch openwrt-25.12 https://git.openwrt.org/openwrt/openwrt.git openwrt
-cd openwrt; git checkout 6cbb072b57e9d72d07097902d975f8a13b768e72; cd -;	#qualcommax: ipq50xx: ax6000: enable pcie1 for QCA9887	
+cd openwrt; git checkout ${OPENWRT_COMMIT}; cd -;
 
-tar xzf /home/ipsec/mtk-feeds-cache.tar.gz
+tar xzf repo-cache/mtk-openwrt-feeds.tar.gz
+mv mtk-clone mtk-openwrt-feeds
 
 #\cp -r my_files/feed_revision mtk-openwrt-feeds/autobuild/unified/
 

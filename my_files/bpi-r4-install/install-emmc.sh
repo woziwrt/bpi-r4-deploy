@@ -1,8 +1,7 @@
 #!/bin/sh
-# install-emmc.sh — Install OpenWrt to eMMC
+# install-emmc.sh - Install OpenWrt to eMMC
 # Must be run from NAND rescue system only!
 
-EMMC_IMG="/tmp/emmc-img.bin"
 EMMC_DEV="/dev/mmcblk0"
 EMMC_BOOT="/dev/mmcblk0boot0"
 GH_USER="woziwrt"
@@ -16,6 +15,47 @@ printf "\n"
 printf "=================================================\n"
 printf "  BPI-R4 eMMC Installer\n"
 printf "=================================================\n"
+printf "\n"
+
+# || 0. Variant selection |||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+printf "Select your board variant:\n"
+printf "\n"
+printf "  1) 4GB standard (WiFi)\n"
+printf "  2) 4GB wired (no WiFi)\n"
+printf "  3) 4GB PoE (WiFi)\n"
+printf "  4) 4GB PoE wired (no WiFi)\n"
+printf "  5) 8GB standard (WiFi)\n"
+printf "  6) 8GB wired (no WiFi)\n"
+printf "  7) 8GB PoE (WiFi)\n"
+printf "  8) 8GB PoE wired (no WiFi)\n"
+printf "  9) 8GB wired UniFi\n"
+printf " 10) 8GB PoE wired UniFi\n"
+printf "\n"
+printf "Enter choice [1-10]: "
+read VARIANT
+
+case "$VARIANT" in
+    1) GH_TAG="release-4gb-standard";        EMMC_NAME="openwrt-mediatek-filogic-bananapi_bpi-r4-emmc-img.bin" ;;
+    2) GH_TAG="release-4gb-wired";           EMMC_NAME="openwrt-mediatek-filogic-bananapi_bpi-r4-emmc-img.bin" ;;
+    3) GH_TAG="release-4gb-poe";             EMMC_NAME="openwrt-mediatek-filogic-bananapi_bpi-r4-poe-emmc-img.bin" ;;
+    4) GH_TAG="release-4gb-poe-wired";       EMMC_NAME="openwrt-mediatek-filogic-bananapi_bpi-r4-poe-emmc-img.bin" ;;
+    5) GH_TAG="release-8gb-standard";        EMMC_NAME="openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-emmc-img.bin" ;;
+    6) GH_TAG="release-8gb-wired";           EMMC_NAME="openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-emmc-img.bin" ;;
+    7) GH_TAG="release-8gb-poe";             EMMC_NAME="openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-emmc-img.bin" ;;
+    8) GH_TAG="release-8gb-poe-wired";       EMMC_NAME="openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-emmc-img.bin" ;;
+    9) GH_TAG="release-8gb-wired-unifi";     EMMC_NAME="openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-emmc-img.bin" ;;
+   10) GH_TAG="release-8gb-poe-wired-unifi"; EMMC_NAME="openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-emmc-img.bin" ;;
+    *)
+        printf "\n${RED}ERROR: Invalid choice!${NC}\n\n"
+        exit 1
+        ;;
+esac
+
+EMMC_IMG="/tmp/${EMMC_NAME}"
+
+printf "\n"
+printf "  Selected: %s\n" "$GH_TAG"
 printf "\n"
 
 # || 1. Check boot media |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -71,6 +111,7 @@ case "$USE_LOCAL" in
         printf "\n"
         printf "        INFO: Using local files from /tmp\n"
         printf "        Checking files...\n"
+        EMMC_IMG="/tmp/openwrt-mediatek-filogic-bananapi_bpi-r4-emmc-img.bin"
         if [ ! -f "$EMMC_IMG" ]; then
             printf "${RED}ERROR: %s not found!${NC}\n" "$EMMC_IMG"
             exit 1
@@ -97,15 +138,14 @@ case "$USE_LOCAL" in
                 ;;
         esac
 
-        EMMC_IMG_URL="https://github.com/${GH_USER}/${GH_REPO}/releases/download/release-sdcard/openwrt-mediatek-filogic-bananapi_bpi-r4-emmc-img.bin"
-        printf "        URL: %s\n" "$EMMC_IMG_URL"
-        printf "\n"
+        EMMC_IMG_URL="https://github.com/${GH_USER}/${GH_REPO}/releases/download/${GH_TAG}/${EMMC_NAME}"
+        printf "        URL: %s\n\n" "$EMMC_IMG_URL"
 
         # || 4. Network check ||||||||||||||||||||||||||||||||||||||||||||||||
 
         printf "[ 4/7 ] Network check...\n"
         printf "\n"
-        printf "        INFO: Internet required (~103 MB download)\n"
+        printf "        INFO: Internet required (~154 MB download)\n"
         printf "        Is ethernet connected? [yes/no]: "
         read NET_CONFIRM
 
@@ -124,28 +164,25 @@ case "$USE_LOCAL" in
         printf "        OK -- network available\n\n"
 
         printf "        Checking release availability...\n"
-        HTTP_CODE=$(wget --server-response --spider "$EMMC_IMG_URL" 2>&1 | grep "HTTP/" | tail -1 | awk "{print \$2}")
+        HTTP_CODE=$(wget --server-response --spider "$EMMC_IMG_URL" 2>&1 | grep "HTTP/" | tail -1 | awk '{print $2}')
         if [ "$HTTP_CODE" != "200" ]; then
-            printf "\n${RED}ERROR: Release not found on GitHub.${NC}\n"
+            printf "\n${RED}ERROR: Release not found on GitHub (tag: %s).\n" "$GH_TAG"
             printf "       The build has not been created yet.\n"
             printf "       Please run the GitHub Actions workflow first:\n"
-            printf "       https://github.com/${GH_USER}/${GH_REPO}/actions\n\n"
+            printf "       https://github.com/${GH_USER}/${GH_REPO}/actions\n\n${NC}"
             exit 1
         fi
         printf "        OK -- release available\n\n"
 
         # || 5. Download emmc-img.bin ||||||||||||||||||||||||||||||||||||||||
 
-        printf "[ 5/7 ] Downloading emmc-img.bin (~103 MB)...\n"
-        printf "\n"
+        printf "[ 5/7 ] Downloading %s...\n\n" "$EMMC_NAME"
 
         wget -O "$EMMC_IMG" "$EMMC_IMG_URL"
 
         if [ $? -ne 0 ] || [ ! -s "$EMMC_IMG" ]; then
-            printf "\n"
-            printf "${RED}ERROR: Download failed.${NC}\n"
-            printf "       Check network or URL and try again.\n"
-            printf "\n"
+            printf "\n${RED}ERROR: Download failed.${NC}\n"
+            printf "       Check network or URL and try again.\n\n"
             rm -f "$EMMC_IMG"
             exit 1
         fi

@@ -201,10 +201,27 @@ jobs:
             "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-emmc-img.bin" \
             "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-snand-img.bin"
 
-          # UniFi variants = same artifacts as 8gb wired, separate tags
+          # SD rescue image into all release dirs
+          for DIR in rel-4gb rel-4gb-poe rel-8gb rel-8gb-poe; do
+            cp rescue/bpi-r4-rescue-sdcard.img.gz "$DIR/"
+          done
+
+          # UniFi variants = same firmware as 8gb wired + UniFi scripts
           if [ "$VARIANT" = "wired" ]; then
+            cp -r rel-4gb     rel-4gb-wired
+            cp -r rel-4gb-poe rel-4gb-poe-wired
+            cp -r rel-8gb     rel-8gb-wired
+            cp -r rel-8gb-poe rel-8gb-poe-wired
+
             cp -r rel-8gb     rel-8gb-unifi
             cp -r rel-8gb-poe rel-8gb-poe-unifi
+
+            for DIR in rel-8gb-unifi rel-8gb-poe-unifi; do
+              cp unifi/unifi-setup.sh             "$DIR/"
+              cp unifi/rc.local                   "$DIR/"
+              cp unifi/rc-network.sh              "$DIR/"
+              cp unifi/unifi-network-setup-8gb.sh "$DIR/unifi-network-setup.sh"
+            done
           fi
 
       - name: Publish release-4gb-standard
@@ -268,7 +285,7 @@ jobs:
           body: |
             Variant: wired (no WiFi) | RAM: 4GB
             Commit: ${{ github.event.inputs.repo_commit || github.sha }}
-          files: rel-4gb/*
+          files: rel-4gb-wired/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -281,7 +298,7 @@ jobs:
           body: |
             Variant: wired (no WiFi) | RAM: 4GB | PoE
             Commit: ${{ github.event.inputs.repo_commit || github.sha }}
-          files: rel-4gb-poe/*
+          files: rel-4gb-poe-wired/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -294,7 +311,7 @@ jobs:
           body: |
             Variant: wired (no WiFi) | RAM: 8GB
             Commit: ${{ github.event.inputs.repo_commit || github.sha }}
-          files: rel-8gb/*
+          files: rel-8gb-wired/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -307,7 +324,7 @@ jobs:
           body: |
             Variant: wired (no WiFi) | RAM: 8GB | PoE
             Commit: ${{ github.event.inputs.repo_commit || github.sha }}
-          files: rel-8gb-poe/*
+          files: rel-8gb-poe-wired/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -319,6 +336,7 @@ jobs:
           name: "BPI-R4 8GB wired UniFi (latest)"
           body: |
             Variant: wired (no WiFi) | RAM: 8GB | UniFi stack
+            Includes: unifi-setup.sh, unifi-network-setup.sh, rc.local, rc-network.sh
             Commit: ${{ github.event.inputs.repo_commit || github.sha }}
           files: rel-8gb-unifi/*
         env:
@@ -332,6 +350,7 @@ jobs:
           name: "BPI-R4 8GB PoE wired UniFi (latest)"
           body: |
             Variant: wired (no WiFi) | RAM: 8GB | PoE | UniFi stack
+            Includes: unifi-setup.sh, unifi-network-setup.sh, rc.local, rc-network.sh
             Commit: ${{ github.event.inputs.repo_commit || github.sha }}
           files: rel-8gb-poe-unifi/*
         env:

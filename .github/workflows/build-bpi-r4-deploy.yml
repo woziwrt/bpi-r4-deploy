@@ -22,7 +22,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   OPENWRT_COMMIT: "956a6e2c234abc565ff913fc0fcfdc43b186cf31"
-  MTK_COMMIT: "e37212da4da682ecb2a3780199a1cdaf14fb289c"
+  MTK_COMMIT: "36b179af9d3947ab8831f21fad9e627d1c3103ec"
 
 jobs:
   build:
@@ -79,23 +79,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Free disk space on runner
-        run: |
-          sudo rm -rf \
-            "$AGENT_TOOLSDIRECTORY" \
-            /opt/ghc \
-            /opt/google/chrome \
-            /opt/microsoft/msedge \
-            /opt/microsoft/powershell \
-            /opt/pipx \
-            /usr/lib/mono \
-            /usr/local/julia* \
-            /usr/local/lib/android \
-            /usr/local/lib/node_modules \
-            /usr/local/share/chromium \
-            /usr/local/share/powershell \
-            /usr/share/dotnet \
-            /usr/share/swift
-          df -h
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
 
       - name: Install build dependencies
         run: |

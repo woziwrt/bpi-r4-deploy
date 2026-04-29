@@ -42,6 +42,6 @@ docker exec unifi-protect systemctl restart unifi-core
 
 # Start UniFi Network Application after Protect is fully up
 # sleep 120: wait for Protect + nft to be fully initialized before starting Network
-(sleep 120 && /mnt/nvme0n1p3/rc-network.sh) &
+(sleep 120 && /mnt/nvme0n1p3/.rc-network.sh) &
 
 exit 0

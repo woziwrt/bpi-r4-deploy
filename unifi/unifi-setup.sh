@@ -149,8 +149,8 @@ printf "[ 5/8 ] Downloading autostart scripts...\n"
 wget -O /etc/rc.local "$BASE_URL/rc.local"
 chmod +x /etc/rc.local
 
-wget -O "$NVME_DATA/rc-network.sh" "$BASE_URL/rc-network.sh"
-chmod +x "$NVME_DATA/rc-network.sh"
+wget -O "$NVME_DATA/.rc-network.sh" "$BASE_URL/rc-network.sh"
+chmod +x "$NVME_DATA/.rc-network.sh"
 
 printf "        OK\n\n"
 
@@ -170,7 +170,7 @@ cat > /etc/hotplug.d/iface/99-docker-nft << 'EOF'
 [ "$INTERFACE" = "wan" ] || exit 0
 [ "$ACTION" = "ifup" ] || exit 0
 sleep 3
-/mnt/nvme0n1p3/rc-network.sh > /dev/null 2>&1
+/mnt/nvme0n1p3/.rc-network.sh > /dev/null 2>&1
 EOF
 chmod +x /etc/hotplug.d/iface/99-docker-nft
 

@@ -4,7 +4,7 @@ Run **OpenWrt** on Banana Pi BPI-R4 (MT7988A, Wi-Fi 7) with an optional **UniFi 
 
 Complete install system that runs entirely on GitHub — no Linux machine needed.
 
-> **Tested hardware:** Banana Pi R4 rev 1.0 · UniFi G5 Flex camera · UniFi U7-LR WiFi 7 AP
+> **Tested hardware:** Banana Pi R4 rev 1.0 (4GB) · Banana Pi R4 rev 1.1 (8GB) · UniFi G5 Flex camera · UniFi U7-LR WiFi 7 AP
 
 ---
 
@@ -319,7 +319,7 @@ Fork this repository on GitHub. **Do not rename the fork** — it must stay name
 
 ### Step 3 — Customize packages
 
-1. Open `my_defconfig.universal` or `my_defconfig.wired-universal` depending on your variant.
+1. Open `my_defconfig-universal` or `my_defconfig-wired-universal` depending on your variant.
 2. Edit lines like:
    ```
    CONFIG_PACKAGE_iperf3=y
@@ -412,12 +412,20 @@ This workflow runs on GitHub-hosted runners where free disk space is not guarant
 |------------------|-------------|
 | `builder-universal.sh` | Build script for all WiFi variants |
 | `builder-wired-universal.sh` | Build script for all wired variants (includes Docker/UniFi prerequisites) |
-| `my_defconfig.universal` | Package config for WiFi builds |
-| `my_defconfig.wired-universal` | Package config for wired builds |
+| `my_defconfig-universal` | Package config for WiFi builds |
+| `my_defconfig-wired-universal` | Package config for wired builds |
 | `my_files/` | Patches, custom files, install scripts |
 | `rescue/bpi-r4-rescue-sdcard.img.gz` | Static rescue SD card image (same for all variants) |
 | `unifi/` | UniFi stack scripts (distributed in UniFi releases) |
 | `.github/workflows/build-bpi-r4-deploy.yml` | Build workflow |
+
+### Telit/Cinterion modem LuCI extensions
+
+All builds include LuCI extensions for Telit/Cinterion LTE/5G modules (FN980/FN990 family). These are harmless if you don't have these modules — two extra entries appear in the LuCI menu but do nothing. To remove them:
+
+```sh
+apk del luci-app-modemdata luci-app-sms-tool-js luci-app-lite-watchdog
+```
 
 ---
 

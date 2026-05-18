@@ -499,6 +499,16 @@ CONFIG_WPA_MSG_MIN_PRIORITY=2
 CONFIG_PACKAGE_trusted-firmware-a-mt7988-spim-nand-ubi-comb-4bg=y
 CONFIG_PACKAGE_trusted-firmware-a-mt7988-emmc-comb-4bg=y
 CONFIG_PACKAGE_trusted-firmware-a-mt7988-sdmmc-comb-4bg=y
+
+# Fibocom L850 modem desteği
+CONFIG_PACKAGE_modeminfo=y
+CONFIG_PACKAGE_modeminfo-serial-fibocom=y
+CONFIG_PACKAGE_modeminfo-serial-xmm=y
+CONFIG_PACKAGE_luci-proto-xmm=y
+CONFIG_PACKAGE_xmm-modem=y
+CONFIG_PACKAGE_atinout=y
+CONFIG_PACKAGE_luci-app-atinout=y
+
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_bananapi_bpi-r4-8gb=y
 CONFIG_TARGET_DEVICE_PACKAGES_mediatek_filogic_DEVICE_bananapi_bpi-r4-8gb=""
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_bananapi_bpi-r4-poe-8gb=y

@@ -70,15 +70,29 @@ chmod -R 755 feeds/packages/utils/modemdata/files/usr/share
 \cp -r ../configs/my_defconfig-4gb-poe-wifi .config
 make defconfig
 
-# Fibocom L850 modem config
-echo "CONFIG_PACKAGE_modeminfo=y" >> .config
-echo "CONFIG_PACKAGE_modeminfo-serial-fibocom=y" >> .config
-echo "CONFIG_PACKAGE_modeminfo-serial-xmm=y" >> .config
-echo "CONFIG_PACKAGE_luci-proto-xmm=y" >> .config
-echo "CONFIG_PACKAGE_xmm-modem=y" >> .config
-echo "CONFIG_PACKAGE_atinout=y" >> .config
-echo "CONFIG_PACKAGE_luci-app-atinout=y" >> .config
+### ------------------------------------------------------------
+### Modemfeed + Fibocom L850 paketleri (koshev-msk/modemfeed)
+### ------------------------------------------------------------
+echo ""
+echo "========================================"
+echo "📶 Modemfeed aktif edildi"
+echo "   Kaynak: https://github.com/koshev-msk/modemfeed"
+echo "========================================"
+echo ""
 
+# Modemfeed paketlerini zorla =y olarak ayarla
+for pkg in modeminfo modeminfo-serial-fibocom modeminfo-serial-xmm \
+           luci-proto-xmm xmm-modem atinout luci-app-atinout \
+           luci-app-modemdata luci-app-sms-tool-js luci-app-lite-watchdog; do
+  echo "CONFIG_PACKAGE_${pkg}=y" >> .config
+  echo "   ✅ ${pkg} -> ENABLED"
+done
+
+echo ""
+echo "========================================"
+echo "🔐 Trusted Firmware (4GB)"
+echo "========================================"
+### ------------------------------------------------------------
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-emmc-comb-4bg=y" >> .config
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-sdmmc-comb-4bg=y" >> .config
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-spim-nand-ubi-comb-4bg=y" >> .config

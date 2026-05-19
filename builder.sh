@@ -5,10 +5,10 @@ rm -rf openwrt
 rm -rf mtk-openwrt-feeds
 
 git clone --branch openwrt-25.12 https://git.openwrt.org/openwrt/openwrt.git openwrt
-cd openwrt; git checkout 6cbb072b57e9d72d07097902d975f8a13b768e72; cd -;	#qualcommax: ipq50xx: ax6000: enable pcie1 for QCA9887	
+cd openwrt; git checkout ${OPENWRT_COMMIT}; cd -;
 
-tar xzf /home/ipsec/mtk-feeds-cache.tar.gz
-	
+tar xzf repo-cache/mtk-openwrt-feeds.tar.gz
+mv mtk-clone mtk-openwrt-feeds
 
 #\cp -r my_files/feed_revision mtk-openwrt-feeds/autobuild/unified/
 
@@ -18,6 +18,10 @@ tar xzf /home/ipsec/mtk-feeds-cache.tar.gz
 #\cp -r my_files/100-wifi-mt76-mt7996-Use-tx_power-from-default-fw-if-EEP.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches
 
 cd openwrt
+
+# modemfeed kaynağını ekle
+echo 'src-git-full modemfeed https://github.com/koshev-msk/modemfeed.git' >> feeds.conf.default
+
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic prepare
 
 
@@ -26,10 +30,14 @@ bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x
 \cp -r ../my_files/451-w-add-bpi-r4-nvme.patch package/boot/uboot-mediatek/patches/451-add-bpi-r4-nvme.patch
 \cp ../my_files/452-w-add-bpi-r4-nvme-rfb.patch package/boot/uboot-mediatek/patches/452-add-bpi-r4-nvme-rfb.patch
 \cp ../my_files/454-w-add-bpi-r4-nvme-env.patch package/boot/uboot-mediatek/patches/454-add-bpi-r4-nvme-env.patch
-\cp -r ../my_files/w-sd-nand-mmc-nvme-ddr4-filogic.mk target/linux/mediatek/image/filogic.mk
+\cp -r ../my_files/w-filogic-bpi-r4-universal.mk target/linux/mediatek/image/filogic.mk
 \cp ../my_files/arm-trusted-firmware-mediatek-Makefile package/boot/arm-trusted-firmware-mediatek/Makefile
 
 echo "CONFIG_BLK_DEV_NVME=y" >> target/linux/mediatek/filogic/config-6.12
+echo "CONFIG_MHI_BUS=y" >> target/linux/mediatek/filogic/config-6.12
+echo "CONFIG_MHI_BUS_PCI_GENERIC=y" >> target/linux/mediatek/filogic/config-6.12
+echo "CONFIG_MHI_BUS_EP=y" >> target/linux/mediatek/filogic/config-6.12
+echo "CONFIG_IOSM=y" >> target/linux/mediatek/filogic/config-6.12
 
 \cp -r ../my_files/999-fitblk-02-w-add-bpi-r4-nvme-fitblk.patch target/linux/mediatek/patches-6.12
 
@@ -46,6 +54,11 @@ chmod +x files/etc/uci-defaults/99-set-hostname
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 
+# modemfeed paketlerini yükle
+./scripts/feeds install -p modemfeed modeminfo modeminfo-serial-fibocom modeminfo-serial-xmm
+./scripts/feeds install -p modemfeed luci-proto-xmm xmm-modem
+./scripts/feeds install -p modemfeed atinout luci-app-atinout
+
 \cp ../my_files/fit.sh package/utils/fitblk/files/fit.sh
 
 \cp -r ../my_files/qmi.sh package/network/utils/uqmi/files/lib/netifd/proto/
@@ -54,13 +67,20 @@ chmod -R 755 feeds/luci/applications/luci-app-modemdata/root
 chmod -R 755 feeds/luci/applications/luci-app-sms-tool-js/root
 chmod -R 755 feeds/packages/utils/modemdata/files/usr/share
 
-\cp -r ../configs/my_defconfig-8gb-standard .config
+\cp -r ../configs/my_defconfig-4gb-poe-wifi .config
 make defconfig
+
+# Fibocom L850 modem config
+echo "CONFIG_PACKAGE_modeminfo=y" >> .config
+echo "CONFIG_PACKAGE_modeminfo-serial-fibocom=y" >> .config
+echo "CONFIG_PACKAGE_modeminfo-serial-xmm=y" >> .config
+echo "CONFIG_PACKAGE_luci-proto-xmm=y" >> .config
+echo "CONFIG_PACKAGE_xmm-modem=y" >> .config
+echo "CONFIG_PACKAGE_atinout=y" >> .config
+echo "CONFIG_PACKAGE_luci-app-atinout=y" >> .config
 
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-emmc-comb-4bg=y" >> .config
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-sdmmc-comb-4bg=y" >> .config
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-spim-nand-ubi-comb-4bg=y" >> .config
 
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic build
-
-

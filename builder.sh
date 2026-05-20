@@ -23,10 +23,10 @@ bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x
 
 
 # modemfeed kaynağını ekle (autobuild.sh prepare'dan sonra)
-# modemfeed kaynağını ekle
-echo 'src-git-full modemfeed https://github.com/koshev-msk/modemfeed.git' >> feeds.conf.default
-echo 'src-git-full xmm7360-pci https://github.com/xmm7360/xmm7360-pci.git' >> feeds.conf.default
-echo 'src-git-full xmm7360-usb https://github.com/xmm7360/xmm7360-usb-modeswitch.git' >> feeds.conf.default
+# modemfeed kaynağını ekle - her satırın sonunda newline olduğundan emin ol
+printf '%s\n' 'src-git-full modemfeed https://github.com/koshev-msk/modemfeed.git' >> feeds.conf.default
+printf '%s\n' 'src-git-full xmm7360-pci https://github.com/xmm7360/xmm7360-pci.git' >> feeds.conf.default
+printf '%s\n' 'src-git-full xmm7360-usb https://github.com/xmm7360/xmm7360-usb-modeswitch.git' >> feeds.conf.default
 
 
 

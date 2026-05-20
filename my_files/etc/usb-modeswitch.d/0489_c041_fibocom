@@ -1,0 +1,7 @@
+# Fibocom L850-GL / L860-GL
+DefaultVendor=0x0489
+DefaultProduct=0xc041
+TargetVendor=0x0489
+TargetProduct=0xe041
+MessageContent="5553424312345678000000000000061b000000020000000000000000000000"
+NeedResponse=1

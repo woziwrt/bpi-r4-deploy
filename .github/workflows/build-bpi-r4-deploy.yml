@@ -113,6 +113,20 @@ jobs:
           OPENWRT_COMMIT: ${{ env.OPENWRT_COMMIT }}
           MTK_COMMIT: ${{ env.MTK_COMMIT }}
 
+      - name: Debug - List built files
+        run: |
+          echo "=== Contents of openwrt/bin/targets/mediatek/filogic ==="
+          ls -la openwrt/bin/targets/mediatek/filogic/ || echo "Directory not found!"
+          echo ""
+          echo "=== Looking for bpi-r4-poe files ==="
+          find openwrt/bin -name "*bpi*r4*poe*" 2>/dev/null || echo "No matching files found"
+          echo ""
+          echo "=== All .itb files ==="
+          find openwrt/bin -name "*.itb" 2>/dev/null || echo "No .itb files found"
+          echo ""
+          echo "=== All .bin files ==="
+          find openwrt/bin -name "*.bin" 2>/dev/null | head -20
+
       - name: Prepare release artifacts
         run: |
           FILOGIC="openwrt/bin/targets/mediatek/filogic"

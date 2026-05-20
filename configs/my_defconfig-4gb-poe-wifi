@@ -508,3 +508,6 @@ CONFIG_PACKAGE_xmm-modem=y
 CONFIG_PACKAGE_atinout=y
 CONFIG_PACKAGE_luci-app-atinout=y
 
+# Intel iOSM (M.2 modem) desteği
+CONFIG_PACKAGE_kmod-iosm=y
+

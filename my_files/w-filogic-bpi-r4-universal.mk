@@ -225,6 +225,7 @@ define Device/bananapi_bpi-r4-poe
   DEVICE_PACKAGES += mt798x-2p5g-phy-firmware-internal kmod-mt798x-2p5g-phy
   SUPPORTED_DEVICES += bananapi,bpi-r4-2g5
   UBINIZE_PARTS := fip=:$(STAGING_DIR_IMAGE)/mt7988_bananapi_bpi-r4-poe-snand-u-boot.fip
+  BPI_R4_FIP_NAME := bananapi_bpi-r4-poe
 endef
 TARGET_DEVICES += bananapi_bpi-r4-poe
 

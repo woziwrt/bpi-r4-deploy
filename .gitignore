@@ -1,19 +1,36 @@
-# macOS
-.DS_Store
-
-# Editor backups / temp
-*~
+```
+# Logs and temp files
+*.log
+*.tmp
 *.swp
 
-# wifimgr session/planning docs — not needed for builds
-my_files/luci-app-wifimgr/CLAUDE.md
-my_files/luci-app-wifimgr/CONTEXT.md
-my_files/luci-app-wifimgr/NEXT_SESSION.md
-my_files/luci-app-wifimgr/SESSION_REPORT.md
-my_files/luci-app-wifimgr/TEST_RESULTS.md
-my_files/luci-app-wifimgr/TEST_SPEC.md
-my_files/luci-app-wifimgr/UI_BRIEF.md
-my_files/luci-app-wifimgr/wifimgr-capability-analysis.md
-my_files/luci-app-wifimgr/docs/forum_reply_cookiemonster_post6.md
-my_files/luci-app-wifimgr/docs/mtk_dev_message.md
-my_files/luci-app-wifimgr/docs/test-results-*.md
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Build artifacts
+build/
+dist/
+*.o
+*.obj
+*.out
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+target/
+.gradle/
+
+# System files
+.DS_Store
+Thumbs.db
+```

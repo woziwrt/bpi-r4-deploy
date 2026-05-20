@@ -21,6 +21,8 @@ cd openwrt
 
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic prepare
 
+
+# modemfeed kaynağını ekle (autobuild.sh prepare'dan sonra)
 # modemfeed kaynağını ekle
 echo 'src-git-full modemfeed https://github.com/koshev-msk/modemfeed.git' >> feeds.conf.default
 echo 'src-git-full xmm7360-pci https://github.com/xmm7360/xmm7360-pci.git' >> feeds.conf.default
@@ -34,9 +36,6 @@ echo 'src-git-full xmm7360-usb https://github.com/xmm7360/xmm7360-usb-modeswitch
 \cp ../my_files/452-w-add-bpi-r4-nvme-rfb.patch package/boot/uboot-mediatek/patches/452-add-bpi-r4-nvme-rfb.patch
 \cp ../my_files/454-w-add-bpi-r4-nvme-env.patch package/boot/uboot-mediatek/patches/454-add-bpi-r4-nvme-env.patch
 \cp -r ../my_files/w-filogic-bpi-r4-universal.mk target/linux/mediatek/image/filogic.mk
-
-./scripts/feeds update -a
-./scripts/feeds install -a
 
 # ARM Trusted Firmware Makefile'i feeds güncellendikten sonra kopyala
 \cp ../my_files/arm-trusted-firmware-mediatek-Makefile package/boot/arm-trusted-firmware-mediatek/Makefile
@@ -60,6 +59,7 @@ mkdir -p files/etc/uci-defaults
 \cp -r ../my_files/99-set-hostname files/etc/uci-defaults/
 chmod +x files/etc/uci-defaults/99-set-hostname
 
+# Tüm feed'leri güncelle ve yükle (modemfeed dahil)
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 

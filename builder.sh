@@ -21,6 +21,7 @@ cd openwrt
 
 # modemfeed kaynağını ekle
 echo 'src-git-full modemfeed https://github.com/koshev-msk/modemfeed.git' >> feeds.conf.default
+echo 'src-git-full xmm7360 https://github.com/xmm7360/xmm7360-pci.git' >> feeds.conf.default
 
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic prepare
 
@@ -66,6 +67,9 @@ chmod +x files/etc/uci-defaults/99-set-hostname
 ./scripts/feeds install -p modemfeed atinout luci-app-atinout
 ./scripts/feeds install -p modemfeed uqmi comgt comgt-ncm
 
+# xmm7360 driver'ını yükle (Intel XMM7360 LTE modemi için)
+./scripts/feeds install -p xmm7360 kmod-xmm7360
+
 \cp ../my_files/fit.sh package/utils/fitblk/files/fit.sh
 
 \cp -r ../my_files/qmi.sh package/network/utils/uqmi/files/lib/netifd/proto/
@@ -79,11 +83,18 @@ make defconfig
 
 ### ------------------------------------------------------------
 ### Modemfeed + Fibocom L850 paketleri (koshev-msk/modemfeed)
+### xmm7360 driver (Intel XMM7360 PCIe LTE modem)
 ### ------------------------------------------------------------
 echo ""
 echo "========================================"
 echo "📶 Modemfeed aktif edildi"
 echo "   Kaynak: https://github.com/koshev-msk/modemfeed"
+echo "========================================"
+echo ""
+echo "========================================"
+echo "📡 xmm7360 driver aktif edildi"
+echo "   Kaynak: https://github.com/xmm7360/xmm7360-pci"
+echo "   Paket: kmod-xmm7360 (Intel XMM7360 PCIe)"
 echo "========================================"
 echo ""
 
@@ -94,6 +105,10 @@ for pkg in modeminfo modeminfo-serial-fibocom modeminfo-serial-xmm \
   echo "CONFIG_PACKAGE_${pkg}=y" >> .config
   echo "   ✅ ${pkg} -> ENABLED"
 done
+
+# xmm7360 driver'ını zorla =y olarak ayarla
+echo "CONFIG_PACKAGE_kmod-xmm7360=y" >> .config
+echo "   ✅ kmod-xmm7360 -> ENABLED"
 
 echo ""
 echo "========================================"

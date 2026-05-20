@@ -1,1 +1,1 @@
-Nothing should be ignored based on the provided file changes, as they are all shell script files (.sh) which are source code files and not build artifacts, dependencies, or temporary files.
+(builder.sh is a shell script file, which is source code/config file, so no need to add any ignore rules)

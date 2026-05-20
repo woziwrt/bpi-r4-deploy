@@ -21,7 +21,8 @@ cd openwrt
 
 # modemfeed kaynağını ekle
 echo 'src-git-full modemfeed https://github.com/koshev-msk/modemfeed.git' >> feeds.conf.default
-echo 'src-git-full xmm7360 https://github.com/xmm7360/xmm7360-pci.git' >> feeds.conf.default
+echo 'src-git-full xmm7360-pci https://github.com/xmm7360/xmm7360-pci.git' >> feeds.conf.default
+echo 'src-git-full xmm7360-usb https://github.com/xmm7360/xmm7360-usb-modeswitch.git' >> feeds.conf.default
 
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic prepare
 
@@ -67,8 +68,15 @@ chmod +x files/etc/uci-defaults/99-set-hostname
 ./scripts/feeds install -p modemfeed atinout luci-app-atinout
 ./scripts/feeds install -p modemfeed uqmi comgt comgt-ncm
 
-# xmm7360 driver'ını yükle (Intel XMM7360 LTE modemi için)
-./scripts/feeds install -p xmm7360 kmod-xmm7360
+# xmm7360 PCIe driver'ını yükle (Intel XMM7360 LTE modemi için)
+./scripts/feeds install -p xmm7360-pci kmod-xmm7360
+
+# xmm7360 USB modeswitch driver'ını yükle (USB modemler için)
+./scripts/feeds install -p xmm7360-usb xmm7360-usb-modeswitch
+
+# iOSM (Intel Open Source Modem) kernel modülü - M.2 modem desteği
+# Not: iOSM, OpenWrt'nin ana kernel paketlerinde mevcuttur, ekstra feed gerekmez
+./scripts/feeds install kmod-iosm
 
 \cp ../my_files/fit.sh package/utils/fitblk/files/fit.sh
 
@@ -83,7 +91,8 @@ make defconfig
 
 ### ------------------------------------------------------------
 ### Modemfeed + Fibocom L850 paketleri (koshev-msk/modemfeed)
-### xmm7360 driver (Intel XMM7360 PCIe LTE modem)
+### xmm7360 PCIe driver (Intel XMM7360 PCIe LTE modem)
+### xmm7360 USB modeswitch (USB modemler için)
 ### ------------------------------------------------------------
 echo ""
 echo "========================================"
@@ -92,9 +101,15 @@ echo "   Kaynak: https://github.com/koshev-msk/modemfeed"
 echo "========================================"
 echo ""
 echo "========================================"
-echo "📡 xmm7360 driver aktif edildi"
+echo "📡 xmm7360 PCIe driver aktif edildi"
 echo "   Kaynak: https://github.com/xmm7360/xmm7360-pci"
 echo "   Paket: kmod-xmm7360 (Intel XMM7360 PCIe)"
+echo "========================================"
+echo ""
+echo "========================================"
+echo "🔌 xmm7360 USB modeswitch driver aktif edildi"
+echo "   Kaynak: https://github.com/xmm7360/xmm7360-usb-modeswitch"
+echo "   Paket: xmm7360-usb-modeswitch (USB modemler için)"
 echo "========================================"
 echo ""
 
@@ -106,14 +121,29 @@ for pkg in modeminfo modeminfo-serial-fibocom modeminfo-serial-xmm \
   echo "   ✅ ${pkg} -> ENABLED"
 done
 
-# xmm7360 driver'ını zorla =y olarak ayarla
+# xmm7360 PCIe driver'ını zorla =y olarak ayarla
 echo "CONFIG_PACKAGE_kmod-xmm7360=y" >> .config
-echo "   ✅ kmod-xmm7360 -> ENABLED"
+echo "   ✅ kmod-xmm7360 (PCIe) -> ENABLED"
+
+# xmm7360 USB modeswitch driver'ını zorla =y olarak ayarla
+echo "CONFIG_PACKAGE_xmm7360-usb-modeswitch=y" >> .config
+echo "   ✅ xmm7360-usb-modeswitch (USB) -> ENABLED"
+
+# iOSM (Intel M.2 modem) kernel modülünü zorla =y olarak ayarla
+echo "CONFIG_PACKAGE_kmod-iosm=y" >> .config
+echo "   ✅ kmod-iosm (Intel M.2 modem) -> ENABLED"
 
 echo ""
 echo "========================================"
 echo "🔐 Trusted Firmware (4GB)"
 echo "========================================"
+echo ""
+echo "========================================"
+echo "📱 iOSM (Intel M.2 modem) aktif edildi"
+echo "   Kernel modülü: kmod-iosm"
+echo "   Desteklenen modemler: Intel M.2 LTE/5G modemler"
+echo "========================================"
+echo ""
 ### ------------------------------------------------------------
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-emmc-comb-4bg=y" >> .config
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-sdmmc-comb-4bg=y" >> .config

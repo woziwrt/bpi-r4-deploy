@@ -23,9 +23,11 @@ bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x
 
 
 # modemfeed kaynağını ekle (autobuild.sh prepare'dan sonra)
+# modemfeed kaynağını ekle
 echo 'src-git-full modemfeed https://github.com/koshev-msk/modemfeed.git' >> feeds.conf.default
 echo 'src-git-full xmm7360-pci https://github.com/xmm7360/xmm7360-pci.git' >> feeds.conf.default
 echo 'src-git-full xmm7360-usb https://github.com/xmm7360/xmm7360-usb-modeswitch.git' >> feeds.conf.default
+
 
 
 \cp -r ../my_files/453-w-add-bpi-r4-nvme-dtso.patch target/linux/mediatek/patches-6.12/

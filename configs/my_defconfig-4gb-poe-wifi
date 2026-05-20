@@ -511,3 +511,6 @@ CONFIG_PACKAGE_luci-app-atinout=y
 # Intel iOSM (M.2 modem) desteği
 CONFIG_PACKAGE_kmod-iosm=y
 
+CONFIG_PACKAGE_usb-modeswitch=y
+CONFIG_PACKAGE_jansson=y
+CONFIG_PACKAGE_xmm7360-usb-modeswitch=y 

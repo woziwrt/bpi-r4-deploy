@@ -26,6 +26,21 @@ bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x
 if [ -f feeds.conf.default ]; then
     # Ensure file ends with newline (add one if missing)
     [ -n "$(tail -c1 feeds.conf.default)" ] && echo >> feeds.conf.default
+    
+    # Remove any empty lines that could cause syntax errors
+    sed -i '/^[[:space:]]*$/d' feeds.conf.default
+fi
+
+# Validate feeds.conf.default - check for syntax errors on line 8
+if [ -f feeds.conf.default ]; then
+    line8=$(sed -n '8p' feeds.conf.default)
+    if [ -n "$line8" ] && ! echo "$line8" | grep -q "^src-git"; then
+        echo "WARNING: Line 8 of feeds.conf.default may have syntax issues: $line8"
+        # Try to fix by removing problematic line if it doesn't start with src-
+        if ! echo "$line8" | grep -qE "^(src-|#|$)"; then
+            sed -i '8d' feeds.conf.default
+        fi
+    fi
 fi
 
 # modemfeed kaynağını ekle - her satırın sonunda newline olduğundan emin ol

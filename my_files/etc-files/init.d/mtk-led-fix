@@ -1,0 +1,58 @@
+#!/bin/sh /etc/rc.common
+#
+# BPI-R4 (MTK SDK): program the mt7530 gphy port-LED registers.
+#
+# The 4 LAN gphys bind to the Generic PHY driver under the mt7530-mmio
+# DSA switch, so nothing configures their LEDs. The pins are muxed by
+# the mt7988a-bananapi-bpi-r4-leds overlay; here we set the LED control
+# registers via mdio so the ports show link + activity.
+#
+# Per port there are two LEDs:
+#   LED0 (green)  ON_CTRL 0x24  BLINK_CTRL 0x25
+#   LED1 (amber)  ON_CTRL 0x26  BLINK_CTRL 0x27   (MMD VEND2 = 0x1f)
+# ON_CTRL 0x_007 = ENABLE | LINK1000 | LINK100 | LINK10  (on at link)
+# BLINK   0x003f = tx/rx blink on 10/100/1000           (activity)
+# phy0/phy1 LEDs are active-low on this board -> POLARITY bit -> 0xc007
+# phy2/phy3 are active-high                            ->          0x8007
+
+# Run early so the brief power-on "WAN/LAN1 lit" (inverted gphy default,
+# before the registers are programmed) is as short as possible. The work
+# is backgrounded and waits for the switch mdio bus, so an early START
+# never blocks boot even with the switch's probe deferral.
+START=10
+
+apply_leds() {
+	local bus=mt7530_dsa-0 i=0
+	command -v mdio >/dev/null 2>&1 || return 0
+	# wait up to ~30s for the mt7530 switch mdio bus to appear
+	while [ ! -e "/sys/class/mdio_bus/$bus" ] && [ "$i" -lt 60 ]; do
+		sleep 0.5; i=$((i + 1))
+	done
+	[ -e "/sys/class/mdio_bus/$bus" ] || return 0
+
+	local p
+	# Only the green LED (LED0) is wired to the gphy on the BPI-R4 - the
+	# amber/right LED (LED1) is not connected to a controllable output on
+	# this board (confirmed: force-on does nothing, and upstream mainline
+	# also configures led0 only). So drive green as link + activity:
+	# on at link, blink on tx/rx.
+	# phy0/phy1 LEDs are active-low on this board -> POLARITY bit (0xc007).
+	for p in 0 1; do
+		mdio "$bus" mmd "$p:0x1f" raw 0x24 0xc007   # green: on at link
+		mdio "$bus" mmd "$p:0x1f" raw 0x25 0x003f   # green: blink on tx/rx
+	done
+	# phy2/phy3 are active-high (no polarity bit).
+	for p in 2 3; do
+		mdio "$bus" mmd "$p:0x1f" raw 0x24 0x8007   # green: on at link
+		mdio "$bus" mmd "$p:0x1f" raw 0x25 0x003f   # green: blink on tx/rx
+	done
+}
+
+boot() {
+	# background: don't block boot while waiting for the switch
+	apply_leds &
+}
+
+start() {
+	apply_leds
+}

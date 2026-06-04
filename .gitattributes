@@ -1,1 +1,4 @@
 * text=auto eol=lf
+
+# etc-files scripts (no extension) must stay LF / no BOM
+my_files/etc-files/** text eol=lf

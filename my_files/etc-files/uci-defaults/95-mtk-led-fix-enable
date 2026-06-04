@@ -1,0 +1,6 @@
+#!/bin/sh
+# Enable and run the BPI-R4 port-LED register fix at boot.
+[ -x /etc/init.d/mtk-led-fix ] || exit 0
+/etc/init.d/mtk-led-fix enable
+/etc/init.d/mtk-led-fix start
+exit 0

@@ -100,7 +100,8 @@ mt7988a-bananapi-bpi-r4-rtc \
 mt7988a-bananapi-bpi-r4-sd \
 mt7988a-bananapi-bpi-r4-spim-nand \
 mt7988a-bananapi-bpi-r4-spim-nand-nmbm \
-mt7988a-bananapi-bpi-r4-nvme
+mt7988a-bananapi-bpi-r4-nvme \
+mt7988a-bananapi-bpi-r4-leds
   DEVICE_DTC_FLAGS := --pad 4096
   DEVICE_PACKAGES := kmod-hwmon-pwmfan kmod-i2c-mux-pca954x kmod-eeprom-at24 \
     kmod-rtc-pcf8563 kmod-sfp kmod-phy-aquantia kmod-usb3 e2fsprogs f2fsck mkf2fs mt7988-wo-firmware
@@ -159,7 +160,8 @@ mt7988a-bananapi-bpi-r4-rtc \
 mt7988a-bananapi-bpi-r4-sd \
 mt7988a-bananapi-bpi-r4-spim-nand \
 mt7988a-bananapi-bpi-r4-spim-nand-nmbm \
-mt7988a-bananapi-bpi-r4-nvme
+mt7988a-bananapi-bpi-r4-nvme \
+mt7988a-bananapi-bpi-r4-leds
   DEVICE_DTC_FLAGS := --pad 4096
   DEVICE_PACKAGES := kmod-hwmon-pwmfan kmod-i2c-mux-pca954x kmod-eeprom-at24 \
     kmod-rtc-pcf8563 kmod-sfp kmod-phy-aquantia kmod-usb3 e2fsprogs f2fsck mkf2fs mt7988-wo-firmware

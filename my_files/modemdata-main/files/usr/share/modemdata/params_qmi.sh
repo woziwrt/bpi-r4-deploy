@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# (c) 2023-2025 Cezary Jackiewicz <cezary@eko.one.pl>
+# (c) 2023-2026 Cezary Jackiewicz <cezary@eko.one.pl>
 #
 
 DEVICE=$1
@@ -20,6 +20,10 @@ FORCE_PLMN=$2
 MBIM=$3
 [ "x$MBIM" = "x1" ] && MBIM="-m" || MBIM=""
 
+json_number_first() {
+	echo "$1" | sed -n 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*\(-\{0,1\}[0-9][0-9.]*\).*/\1/p' | head -n 1
+}
+
 type=""
 rssi=""
 rsrq=""
@@ -31,10 +35,10 @@ fgrsrq=""
 fgrsrp=""
 fgsnr=""
 T=$(uqmi -t 3000 -s -d $DEVICE $MBIM --get-signal-info 2>/dev/null)
-if [ -n "$(echo "$T" | jsonfilter -q -e '@.type')" ]; then
-	eval $(echo "$T" | jsonfilter -q -e 'type=@.type' -e 'rssi=@.rssi' -e 'rsrq=@.rsrq' -e 'rsrp=@.rsrp' -e 'snr=@.snr' -e 'ecio=@.ecio')
+if [ -n "$(jsonfilter -s "$T" -q -e '@.type')" ]; then
+	eval $(jsonfilter -s "$T" -q -e 'type=@.type' -e 'rssi=@.rssi' -e 'rsrq=@.rsrq' -e 'rsrp=@.rsrp' -e 'snr=@.snr' -e 'ecio=@.ecio')
 else
-	eval $(echo "$T" | jsonfilter -q \
+	eval $(jsonfilter -s "$T" -q \
 		-e 'type=@[0].type' -e 'rssi=@[0].rssi' -e 'rsrq=@[0].rsrq' -e 'rsrp=@[0].rsrp' -e 'snr=@[0].snr' \
 		-e 'fgtype=@[1].type' -e 'fgrsrq=@[1].rsrq' -e 'fgrsrp=@[1].rsrp' -e 'fgsnr=@[1].snr')
 fi
@@ -59,10 +63,10 @@ fi
 
 COPS_NUM="${plmn_mcc}${plmn_mnc}"
 if [ -n "$COPS_NUM" ]; then
-	COUNTRY=$(awk -F[\;] '/^'$COPS_NUM';/ {print $2}' /usr/share/modemdata/mccmnc.dat)
+	COUNTRY=$(awk -F[\;] '/^'$COPS_NUM';/ {print $2}' /usr/share/modemdata/libs/mccmnc.dat)
 	if [ -z "$COUNTRY" ]; then
 		T=$(printf %03d $plmn_mnc)
-		COUNTRY=$(awk -F[\;] '/^'${plmn_mcc}${T}';/ {print $2}' /usr/share/modemdata/mccmnc.dat)
+		COUNTRY=$(awk -F[\;] '/^'${plmn_mcc}${T}';/ {print $2}' /usr/share/modemdata/libs/mccmnc.dat)
 		if [ -n "$COUNTRY" ]; then
 			plmn_mnc="$T"
 			COPS_NUM="${plmn_mcc}${plmn_mnc}"
@@ -70,7 +74,7 @@ if [ -n "$COPS_NUM" ]; then
 	fi
 
 	if [ -n "$FORCE_PLMN" ]; then
-		plmn_description=$(awk -F[\;] '/^'$COPS_NUM';/ {print $3}' /usr/share/modemdata/mccmnc.dat)
+		plmn_description=$(awk -F[\;] '/^'$COPS_NUM';/ {print $3}' /usr/share/modemdata/libs/mccmnc.dat)
 		[ -z "$plmn_description" ] && plmn_description="$COPS_NUM"
 	fi
 fi
@@ -132,12 +136,12 @@ S4PCI=""
 S4EARFCN=""
 if [ "$MODE_NUM" = "7" ]; then
 	T=$(uqmi -t 3000 -s -d $DEVICE $MBIM --get-lte-cphy-ca-info 2>/dev/null)
-	eval $(echo "$T" | jsonfilter -q -e 'PB=@.primary.band' -e 'PF=@.primary.frequency' -e 'PBW=@.primary.bandwidth' -e 'PPCI=@.primary.cell_id' -e 'PEARFCN=@.primary.channel')
+	eval $(jsonfilter -s "$T" -q -e 'PB=@.primary.band' -e 'PF=@.primary.frequency' -e 'PBW=@.primary.bandwidth' -e 'PPCI=@.primary.cell_id' -e 'PEARFCN=@.primary.channel')
 	IDX=1
 	for i in 1 2 3 4 5 6 7 8 9 10; do
-		T1=$(echo "$T" | jsonfilter -q -e "@.secondary_${i}.band")
+		T1=$(jsonfilter -s "$T" -q -e "@.secondary_${i}.band")
 		if [ -n "$T1" ]; then
-			eval $(echo "$T" | jsonfilter -q -e "S${IDX}B=@.secondary_${i}.band" -e "S${IDX}F=@.secondary_${i}.frequency" -e "S${IDX}BW=@.secondary_${i}.bandwidth" -e "S${IDX}STATE=@.secondary_${i}.state" -e "S${IDX}PCI=@.secondary_${i}.cell_id" -e "S${IDX}EARFCN=@.secondary_${i}.channel")
+			eval $(jsonfilter -s "$T" -q -e "S${IDX}B=@.secondary_${i}.band" -e "S${IDX}F=@.secondary_${i}.frequency" -e "S${IDX}BW=@.secondary_${i}.bandwidth" -e "S${IDX}STATE=@.secondary_${i}.state" -e "S${IDX}PCI=@.secondary_${i}.cell_id" -e "S${IDX}EARFCN=@.secondary_${i}.channel")
 			[ $IDX = "4" ] && break
 			IDX=$((IDX + 1))
 		fi
@@ -150,7 +154,19 @@ if [ "$MODE_NUM" = "7" ]; then
 	if [ -n "$fgtype" ]; then
 		MODE="${MODE} / ?"
 	else
-		echo "$MODE" | grep -q " / B" && MODE=${MODE/LTE/LTE_A}
+		echo "$MODE" | grep -q " / B" && MODE=${MODE/LTE/LTE-A}
+	fi
+	if [ -z "$PB" ] || [ -z "$PPCI" ] || [ -z "$PEARFCN" ]; then
+		T=$(uqmi -t 3000 -s -d $DEVICE $MBIM --get-cell-location-info 2>/dev/null)
+		[ -z "$PB" ] && PB=$(json_number_first "$T" "band")
+		[ -z "$PF" ] && PF=$(json_number_first "$T" "frequency")
+		[ -z "$PPCI" ] && PPCI=$(json_number_first "$T" "serving_cell_id")
+		[ -z "$PPCI" ] && PPCI=$(json_number_first "$T" "physical_cell_id")
+		[ -z "$PEARFCN" ] && PEARFCN=$(json_number_first "$T" "channel")
+		if [ -n "$PB" ] && ! echo "$MODE" | grep -q " B${PB}"; then
+			MODE="${MODE} B${PB}"
+			[ -n "$PF" ] && MODE="${MODE} (${PF} MHz)"
+		fi
 	fi
 fi
 
@@ -179,7 +195,7 @@ ADDON=""
 [ -n "$rssi" ] && ADDON="${ADDON}{\"idx\":35,\"key\":\"RSSI\",\"value\":\"$rssi dBm\"},"
 if [ "$MODE_NUM" = "7" ]; then
 	[ -n "$TAC" ] && ADDON="${ADDON}{\"idx\":23,\"key\":\"TAC\",\"value\":\"$TAC (${TAC_HEX})\"},"
-	[ -n "$PB" ] && ADDON="${ADDON}{\"idx\":30,\"key\":\"Primary band\",\"value\":\"B${PB} (${PF} MHz) @${PBW} MHz\"},"
+	[ -n "$PB" ] && ADDON="${ADDON}{\"idx\":30,\"key\":\"Primary band\",\"value\":\"B${PB}${PF:+ (${PF} MHz)}${PBW:+ @${PBW} MHz}\"},"
 	[ -n "$rsrp" ] && ADDON="${ADDON}{\"idx\":36,\"key\":\"RSRP\",\"value\":\"$rsrp dBm\"},"
 	[ -n "$rsrq" ] && ADDON="${ADDON}{\"idx\":37,\"key\":\"RSRQ\",\"value\":\"$rsrq dB\"},"
 	[ -n "$snr" ] && ADDON="${ADDON}{\"idx\":38,\"key\":\"SNR\",\"value\":\"$(printf "%.1f" $snr) dB\"},"

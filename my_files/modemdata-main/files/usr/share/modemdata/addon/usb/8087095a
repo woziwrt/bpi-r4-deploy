@@ -97,7 +97,7 @@ if [ "x$MODE_NUM" = "x7" ]; then
 				else
 					addon 50 "(S1) band" "$S1B @${BWS1} MHz"
 				fi
-				MODE="${MODE/LTE/LTE_A} / $S1B"
+				MODE="${MODE/LTE/LTE-A} / $S1B"
 			fi
 			;;
 		"3")
@@ -125,7 +125,7 @@ if [ "x$MODE_NUM" = "x7" ]; then
 				else
 					addon 50 "(S1) band" "$S1B @${BWS1} MHz"
 				fi
-				MODE="${MODE/LTE/LTE_A} / $S1B"
+				MODE="${MODE/LTE/LTE-A} / $S1B"
 			fi
 			T=$(echo "$O" | awk -F[,:] '/^\+XLEC:/{print $9}')
 			if [ -n "$T" ] && [ "x$T" != "x0" ]; then
@@ -165,7 +165,7 @@ if [ "x$MODE_NUM" = "x7" ]; then
 				else
 					addon 50 "(S1) band" "$S1B @${BWS1} MHz"
 				fi
-				MODE="${MODE/LTE/LTE_A} / $S1B"
+				MODE="${MODE/LTE/LTE-A} / $S1B"
 			fi
 			T=$(echo "$O" | awk -F[,:] '/^\+XLEC:/{print $10}')
 			if [ -n "$T" ] && [ "x$T" != "x0" ]; then
@@ -217,7 +217,7 @@ if [ "x$MODE_NUM" = "x7" ]; then
 				else
 					addon 50 "(S1) band" "$S1B @${BWS1} MHz"
 				fi
-				MODE="${MODE/LTE/LTE_A} / $S1B"
+				MODE="${MODE/LTE/LTE-A} / $S1B"
 			fi
 			T=$(echo "$O" | awk -F[,:] '/^\+XLEC:/{print $11}')
 			if [ -n "$T" ] && [ "x$T" != "x0" ]; then
@@ -322,7 +322,7 @@ IFS="
 							else
 								addon $POS "(S1) band" "$S1B @${BWS1} MHz"
 							fi
-							MODE="${MODE/LTE/LTE_A} / $S1B"
+							MODE="${MODE/LTE/LTE-A} / $S1B"
 						fi
 						;;
 					2)

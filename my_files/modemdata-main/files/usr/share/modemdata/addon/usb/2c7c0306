@@ -80,7 +80,7 @@ if [ "x$MODE_NUM" = "x7" ]; then
 		else
 			addon 50 "(S1) band" "$(band4g ${B}) @${T1} MHz"
 		fi
-		MODE="${MODE/LTE/LTE_A} / $(band4g ${B})"
+		MODE="${MODE/LTE/LTE-A} / $(band4g ${B})"
 
 		T=$(echo "$O" | awk -F[,:] '/^\+QCAINFO: "scc"/ {print $7}')
 		[ -n "$T" ] && addon 53 "(S1) PCI" "$T"

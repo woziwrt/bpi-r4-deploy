@@ -133,7 +133,7 @@ COPS_NUM=$(getvaluen net-current-plmn Numeric)
 COPS_MCC=$(echo "$COPS_NUM" | cut -c1-3)
 COPS_MNC=$(echo "$COPS_NUM" | cut -c4- )
 COUNTRY=""
-[ -n "$COPS_NUM" ] && COUNTRY=$(awk -F[\;] '/^'$COPS_NUM';/ {print $2}' /usr/share/modemdata/mccmnc.dat)
+[ -n "$COPS_NUM" ] && COUNTRY=$(awk -F[\;] '/^'$COPS_NUM';/ {print $2}' /usr/share/modemdata/libs/mccmnc.dat)
 
 T=$(getvaluen monitoring-status CurrentNetworkType)
 case $T in

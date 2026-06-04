@@ -34,7 +34,6 @@ echo "CONFIG_TASK_IO_ACCOUNTING=y" >> target/linux/mediatek/filogic/config-6.12
 
 \cp -r ../my_files/999-fitblk-02-w-add-bpi-r4-nvme-fitblk.patch target/linux/mediatek/patches-6.12
 
-\cp -r ../my_files/sms-tool/ feeds/packages/utils/sms-tool
 \cp -r ../my_files/modemdata-main/ feeds/packages/utils/modemdata 
 \cp -r ../my_files/luci-app-modemdata-main/luci-app-modemdata/ feeds/luci/applications
 \cp -r ../my_files/luci-app-lite-watchdog/ feeds/luci/applications

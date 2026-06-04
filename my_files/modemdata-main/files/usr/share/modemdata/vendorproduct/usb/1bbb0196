@@ -1,0 +1,45 @@
+# Qualcomm 9207 / USB 1bbb:0196
+
+VENDOR="Qualcomm"
+PRODUCT="Qualcomm 9207 LTE modem (4108)"
+
+O=$(sms_tool -d "$DEVICE" at 'AT+GMI' 2>/dev/null | tr -d '\r')
+T=$(echo "$O" | sed -n '2p' | xargs)
+[ -z "$T" ] && T=$(echo "$O" | awk '/^\+GMI:/{sub(/^\+GMI:[[:space:]]*/, ""); print; exit}' | xargs)
+case "$T" in
+	''|'QUALCOMM INCORPORATED'|'Qualcomm Incorporated')
+		;;
+	*)
+		VENDOR="$T"
+		;;
+esac
+
+O=$(sms_tool -d "$DEVICE" at 'AT+GMM' 2>/dev/null | tr -d '\r')
+T=$(echo "$O" | sed -n '2p' | xargs)
+[ -z "$T" ] && T=$(echo "$O" | awk '/^\+GMM:/{sub(/^\+GMM:[[:space:]]*/, ""); print; exit}' | xargs)
+case "$T" in
+	''|'4108')
+		;;
+	*)
+		PRODUCT="$T"
+		;;
+esac
+
+O=$(sms_tool -d "$DEVICE" at 'AT+GMR' 2>/dev/null | tr -d '\r')
+T=$(echo "$O" | sed -n '2p' | xargs)
+[ -z "$T" ] && T=$(echo "$O" | awk '/^\+GMR:/{sub(/^\+GMR:[[:space:]]*/, ""); print; exit}' | xargs)
+[ -n "$T" ] && REVISION="$T"
+
+O=$(sms_tool -d "$DEVICE" at 'AT+GSN' 2>/dev/null | tr -d '\r')
+T=$(echo "$O" | sed -n '2p' | xargs)
+[ -z "$T" ] && T=$(echo "$O" | sed -n 's/^\([0-9][0-9]*\)$/\1/p' | head -n 1 | xargs)
+[ -n "$T" ] && IMEI="$T"
+
+O=$(sms_tool -d "$DEVICE" at 'AT+ICCID' 2>/dev/null | tr -d '\r')
+T=$(echo "$O" | sed -n 's/^ICCID:[[:space:]]*\(.*\)$/\1/p' | head -n 1 | xargs)
+[ -n "$T" ] && ICCID="$T"
+
+O=$(sms_tool -d "$DEVICE" at 'AT+CIMI' 2>/dev/null | tr -d '\r')
+T=$(echo "$O" | sed -n '2p' | xargs)
+[ -z "$T" ] && T=$(echo "$O" | sed -n 's/^\([0-9][0-9]*\)$/\1/p' | head -n 1 | xargs)
+[ -n "$T" ] && IMSI="$T"

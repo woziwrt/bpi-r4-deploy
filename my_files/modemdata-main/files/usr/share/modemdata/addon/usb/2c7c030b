@@ -1,0 +1,7 @@
+O=$(sms_tool -d $DEVICE at 'AT+CGMM')
+
+if echo "$O" | grep -q "EG120K-EA"; then
+	. $RES/addon/usb/2c7c0512
+else
+	. $RES/addon/usb/2c7c0306
+fi

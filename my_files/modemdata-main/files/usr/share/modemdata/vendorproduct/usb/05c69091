@@ -1,0 +1,13 @@
+# Alcatel Mobilebroadband / Qualcomm QMI, USB 05c6:9091
+
+VENDOR="Alcatel/Qualcomm"
+PRODUCT="Alcatel Mobilebroadband QMI modem"
+
+T=$(uqmi -t 3000 -s -d "$DEVICE" --get-imei 2>/dev/null | tr -d '"\r' | xargs)
+case "$T" in
+	''|*"Not supported"*|*"Invalid"*|*"error"*)
+		;;
+	*)
+		IMEI="$T"
+		;;
+esac

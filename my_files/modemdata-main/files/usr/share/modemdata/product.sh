@@ -6,19 +6,14 @@
 
 DEVICE=$1
 if [ -n "$DEVICE" ] && [ -e "$DEVICE" ]; then
-	O=$(gcom -d "$DEVICE" -s /usr/share/modemdata/vendorproduct.gcom)
-	T=$(echo "$O" | awk '/CGMI:/{gsub(/.*CGMI[ ]*:[ ]*/,"");gsub(/"/,"");print $0}')
-	[ -n "$T" ] && VENDOR="$T"
-	T=$(echo "$O" | awk '/CGMM:/{gsub(/.*CGMM[ ]*:[ ]*/,"");gsub(/"/,"");print $0}')
-	[ -n "$T" ] && PRODUCT="$T"
-	T=$(echo "$O" | awk '/CGMR:/{gsub(/.*CGMR[ ]*:[ ]*/,"");gsub(/"/,"");print $0}')
-	[ -n "$T" ] && REVISION="$T"
-	T=$(echo "$O" | awk '/CGSN:/{gsub(/.*CGSN[ ]*:[ ]*/,"");gsub(/"/,"");print $0}')
-	[ -n "$T" ] && IMEI="$T"
-	T=$(echo "$O" | awk '/CCID:/{gsub(/.*CCID[ ]*:[ ]*/,"");gsub(/"/,"");print $0}')
-	[ -n "$T" ] && ICCID="$T"
-	T=$(echo "$O" | awk '/CIMI:/{gsub(/.*CIMI[ ]*:[ ]*/,"");gsub(/"/,"");print $0}')
-	[ -n "$T" ] && IMSI="$T"
+	RES="/usr/share/modemdata"
+	. $RES/libs/getdevicevendorproduct
+	VIDPID=$(getdevicevendorproduct $DEVICE)
+	if [ -e "$RES/vendorproduct/$VIDPID" ]; then
+		. "$RES/vendorproduct/$VIDPID"
+	else
+		. "$RES/vendorproduct/generic"
+	fi
 fi
 
 cat <<EOF

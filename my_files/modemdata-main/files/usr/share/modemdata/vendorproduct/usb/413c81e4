@@ -1,0 +1,12 @@
+# Dell DW5821e
+
+VENDOR="Dell Inc."
+PRODUCT="DW5821e Snapdragon X20 LTE"
+T=$(sms_tool -d $DEVICE at "at+gmr" | grep -v "^at" | xargs)
+[ -n "$T" ] && REVISION="$T"
+T=$(sms_tool -d $DEVICE at at+gsn | grep -v "^at" | xargs)
+[ -n "$T" ] && IMEI="$T"
+T=$(sms_tool -d $DEVICE at at+iccid | awk '/^ICCID:/{print $2}' | xargs)
+[ -n "$T" ] && ICCID="$T"
+T=$(sms_tool -d $DEVICE at at+cimi | grep -v "^at" | xargs)
+[ -n "$T" ] && IMSI="$T"

@@ -91,7 +91,7 @@ case "$MODE_NUM" in
 		if [ -n "$T" ]; then
 			T1=$(echo "$O" | awk -F[,:\;] '/^\+ZCAINFO/ {print $11}' | xargs)
 			addon 50 "(S1) band" "$(band4g $T) @${T1} MHz"
-			MODE="${MODE/LTE/LTE_A} / $(band4g ${T})"
+			MODE="${MODE/LTE/LTE-A} / $(band4g ${T})"
 			T=$(echo "$O" | awk -F[,:\;] '/^\+ZCAINFO/ {print $7}' | xargs)
 			[ -n "$T" ] && addon 53 "(S1) PCI" "$T"
 			T=$(echo "$O" | awk -F[,:\;] '/^\+ZCAINFO/ {print $10}' | xargs)

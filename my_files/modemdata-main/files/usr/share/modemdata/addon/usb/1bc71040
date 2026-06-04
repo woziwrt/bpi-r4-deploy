@@ -57,7 +57,7 @@ if [ "x$MODE_NUM" = "x7" ]; then
 	if [ -n "$T" ]; then
 		T1=$(channeltoband $T)
 		addon 50 "(S1) band" "$(band4g $T1)"
-		MODE="${MODE/LTE/LTE_A} / $(band4g $T1)"
+		MODE="${MODE/LTE/LTE-A} / $(band4g $T1)"
 	fi
 	T=$(echo "$O" | awk -F[,:] '/^#CAINFO/ {print $17}')
 	[ -n "$T" ] && addon 53 "(S1) PCI" "$T"

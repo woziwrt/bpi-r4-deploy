@@ -85,7 +85,7 @@ if [ "x$MODE_NUM" = "x7" ] || [ "x$MODE_NUM" = "x13" ]; then
 	fi
 
 	LINES=$(echo "$O" | grep -A 10 "^+GTCAINFO:" | grep '^LTE SCC\s*[0-9]:2')
-	echo "$LINES" | grep -q "^LTE SCC" && MODE="${MODE/LTE/LTE_A}"
+	echo "$LINES" | grep -q "^LTE SCC" && MODE="${MODE/LTE/LTE-A}"
 IFS="
 "
 	IDX=1
@@ -130,7 +130,7 @@ IFS="
 		if [ -n "$T" ]; then
 			B=$(band5g ${T/50/})
 			addon $POS "(S${IDX}) band" "$B"
-			MODE="${MODE/LTE_A/5G NSA}"
+			MODE="${MODE/LTE-A/5G NSA}"
 			MODE="${MODE/LTE/5G NSA}"
 			MODE="$MODE / $B"
 		fi

@@ -1,1 +1,4 @@
 * text=auto eol=lf
+
+# modemdata scripts (no extension) must stay LF / no BOM
+my_files/modemdata-main/files/usr/share/modemdata/** text eol=lf

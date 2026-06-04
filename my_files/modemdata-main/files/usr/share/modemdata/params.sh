@@ -147,45 +147,6 @@ band5g() {
 	esac
 }
 
-getdevicevendorproduct() {
-	devname="$(basename $1)"
-	case "$devname" in
-		'mhi_DUN'*)
-			devpath=$(find /sys/devices -name "$devname" -type d 2>/dev/null | head -1)
-			T=${devpath%/*/*/*}
-			if [ -e $T/vendor ] && [ -e $T/device ]; then
-				V=$(cat $T/vendor)
-				D=$(cat $T/device)
-				echo "pci/${V/0x/}${D/0x/}"
-			fi
-			;;
-		'wwan'*'at'*)
-			devpath="$(readlink -f /sys/class/wwan/$devname/device)"
-			T=${devpath%/*/*/*}
-			if [ -e $T/vendor ] && [ -e $T/device ]; then
-				V=$(cat $T/vendor)
-				D=$(cat $T/device)
-				echo "pci/${V/0x/}${D/0x/}"
-			fi
-			;;
-		'ttyACM'*)
-			devpath="$(readlink -f /sys/class/tty/$devname/device)"
-			T=${devpath%/*}
-			echo "usb/$(cat $T/idVendor)$(cat $T/idProduct)"
-			;;
-		'tty'*)
-			devpath="$(readlink -f /sys/class/tty/$devname/device)"
-			T=${devpath%/*/*}
-			echo "usb/$(cat $T/idVendor)$(cat $T/idProduct)"
-			;;
-		*)
-			devpath="$(readlink -f /sys/class/usbmisc/$devname/device)"
-			T=${devpath%/*}
-			echo "usb/$(cat $T/idVendor)$(cat $T/idProduct)"
-			;;
-	esac
-}
-
 addon() {
 	[ -n "$ADDON" ] && ADDON="$ADDON,"
 	ADDON="$ADDON"'{"idx":'$1',"key":"'$2'","value":"'${3//$'\r'/}'"}'
@@ -202,7 +163,7 @@ FORCE_PLMN=$2
 
 RES="/usr/share/modemdata"
 
-O=$(sms_tool -D -d $DEVICE at "AT+CPIN?;+CSQ;+COPS=3,0;+COPS?;+COPS=3,2;+COPS?;+CREG=2;+CREG?")
+O=$(sms_tool -D -d $DEVICE at "AT+CSQ;+COPS=3,0;+COPS?;+COPS=3,2;+COPS?;+CREG=2;+CREG?;+CPIN?" | tr -d '\r')
 
 # CSQ
 CSQ=$(echo "$O" | awk -F[,\ ] '/^\+(csq|CSQ)/ {print $2}')
@@ -228,10 +189,10 @@ fi
 if [ -z "$FORCE_PLMN" ]; then
 	COPS=$(echo "$O" | awk -F[\"] '/^\+COPS:\s*.,0/ {print $2}' | awk '{if(NF==2 && tolower($1)==tolower($2)){print $1}else{print $0}}')
 else
-	[ -n "$COPS_NUM" ] && COPS=$(awk -F[\;] '/^'$COPS_NUM';/ {print $3}' $RES/mccmnc.dat)
+	[ -n "$COPS_NUM" ] && COPS=$(awk -F[\;] '/^'$COPS_NUM';/ {print $3}' $RES/libs/mccmnc.dat)
 fi
 [ -z "$COPS" ] && COPS=$COPS_NUM
-[ -n "$COPS_NUM" ] && COUNTRY=$(awk -F[\;] '/^'$COPS_NUM';/ {print $2}' $RES/mccmnc.dat)
+[ -n "$COPS_NUM" ] && COUNTRY=$(awk -F[\;] '/^'$COPS_NUM';/ {print $2}' $RES/libs/mccmnc.dat)
 
 # CREG
 eval $(echo "$O" | busybox awk -F[,] '/^\+CREG/ {gsub(/[[:space:]"]+/,"");printf "T=\"%d\";LAC_HEX=\"%X\";CID_HEX=\"%X\";LAC_DEC=\"%d\";CID_DEC=\"%d\";MODE_NUM=\"%d\"", $2, "0x"$3, "0x"$4, "0x"$3, "0x"$4, $5}')
@@ -282,6 +243,7 @@ fi
 
 REGOK=0
 [ "x$REG" = "x1" ] || [ "x$REG" = "x5" ] || [ "x$REG" = "x6" ] || [ "x$REG" = "x7" ] && REGOK=1
+. $RES/libs/getdevicevendorproduct
 VIDPID=$(getdevicevendorproduct $DEVICE)
 if [ -e "$RES/addon/$VIDPID" ]; then
 	ADDON=""

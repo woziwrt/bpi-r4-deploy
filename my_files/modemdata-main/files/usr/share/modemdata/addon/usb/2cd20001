@@ -15,7 +15,7 @@ fi
 if [ -z "$FORCE_PLMN" ]; then
 	COPS=$(echo "$O" | awk -F[\"] '/^\+COPS: \(.,0/ {print $2)' | awk '{if(NF==2 && $1==$2){print $1}else{print $0}}')
 else
-	[ -n "$COPS_NUM" ] && COPS=$(awk -F[\;] '/^'$COPS_NUM';/ {print $3}' $RES/mccmnc.dat)
+	[ -n "$COPS_NUM" ] && COPS=$(awk -F[\;] '/^'$COPS_NUM';/ {print $3}' $RES/libs/mccmnc.dat)
 fi
 [ -z "$COPS" ] && COPS=$COPS_NUM
 

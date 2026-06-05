@@ -1,0 +1,94 @@
+--- a/configs/mt7988a_bananapi_bpi-r4-sdmmc_defconfig
++++ b/configs/mt7988a_bananapi_bpi-r4-sdmmc_defconfig
+@@ -1,2 +1,3 @@
+ CONFIG_CMD_MMC=y
++CONFIG_CMD_MDIO=y
+ CONFIG_CMD_MTD=y
+--- a/configs/mt7988a_bananapi_bpi-r4-snand_defconfig
++++ b/configs/mt7988a_bananapi_bpi-r4-snand_defconfig
+@@ -1,2 +1,3 @@
+ CONFIG_CMD_MMC=y
++CONFIG_CMD_MDIO=y
+ CONFIG_CMD_MTD=y
+--- a/configs/mt7988a_bananapi_bpi-r4-emmc_defconfig
++++ b/configs/mt7988a_bananapi_bpi-r4-emmc_defconfig
+@@ -1,2 +1,3 @@
+ CONFIG_CMD_MMC=y
++CONFIG_CMD_MDIO=y
+ CONFIG_CMD_MTD=y
+--- a/configs/mt7988a_bananapi_bpi-r4-poe-sdmmc_defconfig
++++ b/configs/mt7988a_bananapi_bpi-r4-poe-sdmmc_defconfig
+@@ -1,2 +1,3 @@
+ CONFIG_CMD_MMC=y
++CONFIG_CMD_MDIO=y
+ CONFIG_CMD_MTD=y
+--- a/configs/mt7988a_bananapi_bpi-r4-poe-snand_defconfig
++++ b/configs/mt7988a_bananapi_bpi-r4-poe-snand_defconfig
+@@ -1,2 +1,3 @@
+ CONFIG_CMD_MMC=y
++CONFIG_CMD_MDIO=y
+ CONFIG_CMD_MTD=y
+--- a/configs/mt7988a_bananapi_bpi-r4-poe-emmc_defconfig
++++ b/configs/mt7988a_bananapi_bpi-r4-poe-emmc_defconfig
+@@ -1,2 +1,3 @@
+ CONFIG_CMD_MMC=y
++CONFIG_CMD_MDIO=y
+ CONFIG_CMD_MTD=y
+--- a/defenvs/bananapi_bpi-r4_sdmmc_env
++++ b/defenvs/bananapi_bpi-r4_sdmmc_env
+@@ -1,1 +1,1 @@
+-bootcmd=if pstore check ; then run boot_recovery ; else run boot_sdmmc ; fi
++bootcmd=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007 ; if pstore check ; then run boot_recovery ; else run boot_sdmmc ; fi
+@@ -4,3 +4,3 @@
+ bootconf_emmc=mt7988a-bananapi-bpi-r4-emmc
+-bootconf_extra=
++bootconf_extra=mt7988a-bananapi-bpi-r4-leds
+ bootdelay=0
+--- a/defenvs/bananapi_bpi-r4_emmc_env
++++ b/defenvs/bananapi_bpi-r4_emmc_env
+@@ -1,1 +1,1 @@
+-bootcmd=if pstore check ; then run boot_recovery ; else run boot_emmc ; fi
++bootcmd=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007 ; if pstore check ; then run boot_recovery ; else run boot_emmc ; fi
+@@ -3,3 +3,3 @@
+ bootconf_emmc=mt7988a-bananapi-bpi-r4-emmc
+-bootconf_extra=
++bootconf_extra=mt7988a-bananapi-bpi-r4-leds
+ bootdelay=0
+--- a/defenvs/bananapi_bpi-r4-poe_sdmmc_env
++++ b/defenvs/bananapi_bpi-r4-poe_sdmmc_env
+@@ -1,1 +1,1 @@
+-bootcmd=if pstore check ; then run boot_recovery ; else run boot_sdmmc ; fi
++bootcmd=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007 ; if pstore check ; then run boot_recovery ; else run boot_sdmmc ; fi
+@@ -4,3 +4,3 @@
+ bootconf_emmc=mt7988a-bananapi-bpi-r4-emmc
+-bootconf_extra=
++bootconf_extra=mt7988a-bananapi-bpi-r4-leds
+ bootdelay=0
+--- a/defenvs/bananapi_bpi-r4-poe_emmc_env
++++ b/defenvs/bananapi_bpi-r4-poe_emmc_env
+@@ -1,1 +1,1 @@
+-bootcmd=if pstore check ; then run boot_recovery ; else run boot_emmc ; fi
++bootcmd=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007 ; if pstore check ; then run boot_recovery ; else run boot_emmc ; fi
+@@ -3,3 +3,3 @@
+ bootconf_emmc=mt7988a-bananapi-bpi-r4-emmc
+-bootconf_extra=
++bootconf_extra=mt7988a-bananapi-bpi-r4-leds
+ bootdelay=0
+--- a/defenvs/bananapi_bpi-r4_snand_env
++++ b/defenvs/bananapi_bpi-r4_snand_env
+@@ -2,4 +2,4 @@
+ bootconf=config-mt7988a-bananapi-bpi-r4
+-bootconf_extra=mt7988a-bananapi-bpi-r4-spim-nand#mt7988a-bananapi-bpi-r4-emmc
++bootconf_extra=mt7988a-bananapi-bpi-r4-spim-nand#mt7988a-bananapi-bpi-r4-emmc#mt7988a-bananapi-bpi-r4-leds
+-bootcmd=if env exists nvme_boot ; then run boot_nvme ; else if pstore check ; then run boot_recovery ; else run boot_ubi ; fi ; fi
++bootcmd=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007 ; if env exists nvme_boot ; then run boot_nvme ; else if pstore check ; then run boot_recovery ; else run boot_ubi ; fi ; fi
+ bootdelay=0
+--- a/defenvs/bananapi_bpi-r4-poe_snand_env
++++ b/defenvs/bananapi_bpi-r4-poe_snand_env
+@@ -2,4 +2,4 @@
+ bootconf=config-mt7988a-bananapi-bpi-r4-poe
+-bootconf_extra=mt7988a-bananapi-bpi-r4-emmc
++bootconf_extra=mt7988a-bananapi-bpi-r4-emmc#mt7988a-bananapi-bpi-r4-leds
+-bootcmd=if pstore check ; then run boot_recovery ; else run boot_ubi ; fi
++bootcmd=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007 ; if pstore check ; then run boot_recovery ; else run boot_ubi ; fi
+ bootdelay=0

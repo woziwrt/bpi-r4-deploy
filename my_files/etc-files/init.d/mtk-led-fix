@@ -7,13 +7,24 @@
 # the mt7988a-bananapi-bpi-r4-leds overlay; here we set the LED control
 # registers via mdio so the ports show link + activity.
 #
-# Per port there are two LEDs:
+# Per port there are two LEDs (MMD VEND2 = 0x1f):
 #   LED0 (green)  ON_CTRL 0x24  BLINK_CTRL 0x25
-#   LED1 (amber)  ON_CTRL 0x26  BLINK_CTRL 0x27   (MMD VEND2 = 0x1f)
-# ON_CTRL 0x_007 = ENABLE | LINK1000 | LINK100 | LINK10  (on at link)
-# BLINK   0x003f = tx/rx blink on 10/100/1000           (activity)
-# phy0/phy1 LEDs are active-low on this board -> POLARITY bit -> 0xc007
-# phy2/phy3 are active-high                            ->          0x8007
+#   LED1 (amber)  ON_CTRL 0x26  BLINK_CTRL 0x27
+# ON_CTRL  0x_007 = ENABLE | LINK1000 | LINK100 | LINK10   (on at link)
+# BLINK    0x003f = tx/rx blink on 10/100/1000             (activity)
+# Bit 0x4000 (POLARITY) is needed on the active-low ports (phy0/phy1).
+# Only the green LED (LED0) is wired on the BPI-R4 - the amber/right LED
+# (LED1) net is NC on this board, so we configure led0 only.
+#
+# --- board-specific tunables (BPI-R4) ----------------------------------
+LED_ON_CTRL=0x24            # MMD 0x1f register: "LED on" control
+LED_BLINK_CTRL=0x25         # MMD 0x1f register: "LED blink" control
+LED_ON_ACTIVE_LOW=0xc007    # on-at-link, POLARITY set  (phy0/phy1)
+LED_ON_ACTIVE_HIGH=0x8007   # on-at-link, no POLARITY   (phy2/phy3)
+LED_BLINK_TXRX=0x003f       # blink on tx/rx, all speeds
+PORTS_ACTIVE_LOW="0 1"      # WAN, LAN1
+PORTS_ACTIVE_HIGH="2 3"     # LAN2, LAN3
+# -----------------------------------------------------------------------
 
 # Run early so the brief power-on "WAN/LAN1 lit" (inverted gphy default,
 # before the registers are programmed) is as short as possible. The work
@@ -21,30 +32,43 @@
 # never blocks boot even with the switch's probe deferral.
 START=10
 
+# Find the mt7530 switch mdio bus dynamically (don't hardcode the name):
+# prefer the well-known mt7530_dsa-0, otherwise the first *dsa* bus.
+find_bus() {
+	[ -e /sys/class/mdio_bus/mt7530_dsa-0 ] && { echo mt7530_dsa-0; return; }
+	for b in /sys/class/mdio_bus/*dsa*; do
+		[ -e "$b" ] && { basename "$b"; return; }
+	done
+}
+
 apply_leds() {
-	local bus=mt7530_dsa-0 i=0
 	command -v mdio >/dev/null 2>&1 || return 0
+
 	# wait up to ~30s for the mt7530 switch mdio bus to appear
-	while [ ! -e "/sys/class/mdio_bus/$bus" ] && [ "$i" -lt 60 ]; do
+	local bus i=0
+	while [ "$i" -lt 60 ]; do
+		bus=$(find_bus)
+		[ -n "$bus" ] && break
 		sleep 0.5; i=$((i + 1))
 	done
-	[ -e "/sys/class/mdio_bus/$bus" ] || return 0
+	[ -n "$bus" ] || return 0
 
-	local p
-	# Only the green LED (LED0) is wired to the gphy on the BPI-R4 - the
-	# amber/right LED (LED1) is not connected to a controllable output on
-	# this board (confirmed: force-on does nothing, and upstream mainline
-	# also configures led0 only). So drive green as link + activity:
-	# on at link, blink on tx/rx.
-	# phy0/phy1 LEDs are active-low on this board -> POLARITY bit (0xc007).
-	for p in 0 1; do
-		mdio "$bus" mmd "$p:0x1f" raw 0x24 0xc007   # green: on at link
-		mdio "$bus" mmd "$p:0x1f" raw 0x25 0x003f   # green: blink on tx/rx
+	# If a future kernel/driver already exposes these gphy LEDs through
+	# /sys/class/leds (i.e. the workaround is no longer needed), skip -
+	# so we never fight a driver that took over LED control.
+	for l in /sys/class/leds/*mt7530* /sys/class/leds/*lan*phy*; do
+		[ -e "$l" ] && return 0
 	done
-	# phy2/phy3 are active-high (no polarity bit).
-	for p in 2 3; do
-		mdio "$bus" mmd "$p:0x1f" raw 0x24 0x8007   # green: on at link
-		mdio "$bus" mmd "$p:0x1f" raw 0x25 0x003f   # green: blink on tx/rx
+
+	# Green LED0 = link + activity: on at link, blink on tx/rx.
+	local p
+	for p in $PORTS_ACTIVE_LOW; do
+		mdio "$bus" mmd "$p:0x1f" raw "$LED_ON_CTRL"    "$LED_ON_ACTIVE_LOW"
+		mdio "$bus" mmd "$p:0x1f" raw "$LED_BLINK_CTRL" "$LED_BLINK_TXRX"
+	done
+	for p in $PORTS_ACTIVE_HIGH; do
+		mdio "$bus" mmd "$p:0x1f" raw "$LED_ON_CTRL"    "$LED_ON_ACTIVE_HIGH"
+		mdio "$bus" mmd "$p:0x1f" raw "$LED_BLINK_CTRL" "$LED_BLINK_TXRX"
 	done
 }
 

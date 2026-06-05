@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/configs/mt7988a_bananapi_bpi-r4-emmc_defconfig
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,139 @@
 +CONFIG_ARM=y
 +CONFIG_SYS_HAS_NONCACHED_MEMORY=y
 +CONFIG_POSITION_INDEPENDENT=y
@@ -46,7 +46,6 @@
 +CONFIG_CMD_STRINGS=y
 +CONFIG_CMD_DM=y
 +CONFIG_CMD_GPIO=y
-+CONFIG_CMD_MDIO=y
 +CONFIG_CMD_PWM=y
 +CONFIG_CMD_GPT=y
 +CONFIG_CMD_MMC=y
@@ -143,7 +142,7 @@
 +CONFIG_HEXDUMP=y
 --- /dev/null
 +++ b/configs/mt7988a_bananapi_bpi-r4-sdmmc_defconfig
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,139 @@
 +CONFIG_ARM=y
 +CONFIG_SYS_HAS_NONCACHED_MEMORY=y
 +CONFIG_POSITION_INDEPENDENT=y
@@ -189,7 +188,6 @@
 +CONFIG_CMD_STRINGS=y
 +CONFIG_CMD_DM=y
 +CONFIG_CMD_GPIO=y
-+CONFIG_CMD_MDIO=y
 +CONFIG_CMD_PWM=y
 +CONFIG_CMD_GPT=y
 +CONFIG_CMD_MMC=y
@@ -286,7 +284,7 @@
 +CONFIG_HEXDUMP=y
 --- /dev/null
 +++ b/configs/mt7988a_bananapi_bpi-r4-snand_defconfig
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,139 @@
 +CONFIG_ARM=y
 +CONFIG_SYS_HAS_NONCACHED_MEMORY=y
 +CONFIG_POSITION_INDEPENDENT=y
@@ -329,7 +327,6 @@
 +CONFIG_CMD_STRINGS=y
 +CONFIG_CMD_DM=y
 +CONFIG_CMD_GPIO=y
-+CONFIG_CMD_MDIO=y
 +CONFIG_CMD_PWM=y
 +CONFIG_CMD_GPT=y
 +CONFIG_CMD_MMC=y
@@ -429,17 +426,16 @@
 +CONFIG_HEXDUMP=y
 --- /dev/null
 +++ b/defenvs/bananapi_bpi-r4_sdmmc_env
-@@ -0,0 +1,67 @@
+@@ -0,0 +1,66 @@
 +ipaddr=192.168.1.1
 +serverip=192.168.1.254
 +loadaddr=0x50000000
 +bootargs=console=ttyS0,115200n1 pci=pcie_bus_perf root=/dev/fit0 rootwait
-+bootcmd=run ledfix ; if pstore check ; then run boot_recovery ; else run boot_sdmmc ; fi
-+ledfix=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007
++bootcmd=if pstore check ; then run boot_recovery ; else run boot_sdmmc ; fi
 +bootconf=config-mt7988a-bananapi-bpi-r4
 +bootconf_sd=mt7988a-bananapi-bpi-r4-sd
 +bootconf_emmc=mt7988a-bananapi-bpi-r4-emmc
-+bootconf_extra=mt7988a-bananapi-bpi-r4-leds
++bootconf_extra=
 +bootdelay=0
 +bootfile=openwrt-mediatek-filogic-bananapi_bpi-r4-initramfs-recovery.itb
 +bootfile_upg=openwrt-mediatek-filogic-bananapi_bpi-r4-squashfs-sysupgrade.itb
@@ -505,7 +501,7 @@
 +loadaddr=0x50000000
 +bootargs=console=ttyS0,115200n1 pci=pcie_bus_perf root=/dev/fit0 rootwait ubi.block=0,fit
 +bootconf=config-mt7988a-bananapi-bpi-r4
-+bootconf_extra=mt7988a-bananapi-bpi-r4-spim-nand#mt7988a-bananapi-bpi-r4-emmc#mt7988a-bananapi-bpi-r4-leds
++bootconf_extra=mt7988a-bananapi-bpi-r4-spim-nand#mt7988a-bananapi-bpi-r4-emmc
 +bootcmd=if pstore check ; then run boot_recovery ; else run boot_ubi ; fi
 +bootdelay=0
 +bootfile=openwrt-mediatek-filogic-bananapi_bpi-r4-initramfs-recovery.itb
@@ -569,17 +565,16 @@
 +_bootmenu_update_title=setenv _bootmenu_update_title ; setenv bootmenu_title "$bootmenu_title       [33m$ver[0m"
 --- /dev/null
 +++ b/defenvs/bananapi_bpi-r4_emmc_env
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,57 @@
 +ipaddr=192.168.1.1
 +serverip=192.168.1.254
 +loadaddr=0x50000000
 +bootargs=console=ttyS0,115200n1 pci=pcie_bus_perf root=/dev/fit0 rootwait
-+bootcmd=run ledfix ; if pstore check ; then run boot_recovery ; else run boot_emmc ; fi
-+ledfix=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007
++bootcmd=if pstore check ; then run boot_recovery ; else run boot_emmc ; fi
 +bootconf=config-mt7988a-bananapi-bpi-r4
 +bootconf_base=config-mt7988a-bananapi-bpi-r4
 +bootconf_emmc=mt7988a-bananapi-bpi-r4-emmc
-+bootconf_extra=mt7988a-bananapi-bpi-r4-leds
++bootconf_extra=
 +bootdelay=0
 +bootfile=openwrt-mediatek-filogic-bananapi_bpi-r4-initramfs-recovery.itb
 +bootfile_bl2=openwrt-mediatek-filogic-bananapi_bpi-r4-emmc-preloader.bin
@@ -878,7 +873,7 @@
 +};
 --- /dev/null
 +++ b/configs/mt7988a_bananapi_bpi-r4-poe-emmc_defconfig
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,139 @@
 +CONFIG_ARM=y
 +CONFIG_SYS_HAS_NONCACHED_MEMORY=y
 +CONFIG_POSITION_INDEPENDENT=y
@@ -924,7 +919,6 @@
 +CONFIG_CMD_STRINGS=y
 +CONFIG_CMD_DM=y
 +CONFIG_CMD_GPIO=y
-+CONFIG_CMD_MDIO=y
 +CONFIG_CMD_PWM=y
 +CONFIG_CMD_GPT=y
 +CONFIG_CMD_MMC=y
@@ -1021,7 +1015,7 @@
 +CONFIG_HEXDUMP=y
 --- /dev/null
 +++ b/configs/mt7988a_bananapi_bpi-r4-poe-sdmmc_defconfig
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,139 @@
 +CONFIG_ARM=y
 +CONFIG_SYS_HAS_NONCACHED_MEMORY=y
 +CONFIG_POSITION_INDEPENDENT=y
@@ -1067,7 +1061,6 @@
 +CONFIG_CMD_STRINGS=y
 +CONFIG_CMD_DM=y
 +CONFIG_CMD_GPIO=y
-+CONFIG_CMD_MDIO=y
 +CONFIG_CMD_PWM=y
 +CONFIG_CMD_GPT=y
 +CONFIG_CMD_MMC=y
@@ -1164,7 +1157,7 @@
 +CONFIG_HEXDUMP=y
 --- /dev/null
 +++ b/configs/mt7988a_bananapi_bpi-r4-poe-snand_defconfig
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,139 @@
 +CONFIG_ARM=y
 +CONFIG_SYS_HAS_NONCACHED_MEMORY=y
 +CONFIG_POSITION_INDEPENDENT=y
@@ -1207,7 +1200,6 @@
 +CONFIG_CMD_STRINGS=y
 +CONFIG_CMD_DM=y
 +CONFIG_CMD_GPIO=y
-+CONFIG_CMD_MDIO=y
 +CONFIG_CMD_PWM=y
 +CONFIG_CMD_GPT=y
 +CONFIG_CMD_MMC=y
@@ -1307,17 +1299,16 @@
 +CONFIG_HEXDUMP=y
 --- /dev/null
 +++ b/defenvs/bananapi_bpi-r4-poe_emmc_env
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,57 @@
 +ipaddr=192.168.1.1
 +serverip=192.168.1.254
 +loadaddr=0x50000000
 +bootargs=console=ttyS0,115200n1 pci=pcie_bus_perf root=/dev/fit0 rootwait
-+bootcmd=run ledfix ; if pstore check ; then run boot_recovery ; else run boot_emmc ; fi
-+ledfix=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007
++bootcmd=if pstore check ; then run boot_recovery ; else run boot_emmc ; fi
 +bootconf=config-mt7988a-bananapi-bpi-r4-poe
 +bootconf_base=config-mt7988a-bananapi-bpi-r4-poe
 +bootconf_emmc=mt7988a-bananapi-bpi-r4-emmc
-+bootconf_extra=mt7988a-bananapi-bpi-r4-leds
++bootconf_extra=
 +bootdelay=0
 +bootfile=openwrt-mediatek-filogic-bananapi_bpi-r4-poe-initramfs-recovery.itb
 +bootfile_bl2=openwrt-mediatek-filogic-bananapi_bpi-r4-poe-emmc-preloader.bin
@@ -1368,17 +1359,16 @@
 +_bootmenu_update_title=setenv _bootmenu_update_title ; setenv bootmenu_title "$bootmenu_title       [33m$ver[0m"
 --- /dev/null
 +++ b/defenvs/bananapi_bpi-r4-poe_sdmmc_env
-@@ -0,0 +1,67 @@
+@@ -0,0 +1,66 @@
 +ipaddr=192.168.1.1
 +serverip=192.168.1.254
 +loadaddr=0x50000000
 +bootargs=console=ttyS0,115200n1 pci=pcie_bus_perf root=/dev/fit0 rootwait
-+bootcmd=run ledfix ; if pstore check ; then run boot_recovery ; else run boot_sdmmc ; fi
-+ledfix=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007
++bootcmd=if pstore check ; then run boot_recovery ; else run boot_sdmmc ; fi
 +bootconf=config-mt7988a-bananapi-bpi-r4-poe
 +bootconf_sd=mt7988a-bananapi-bpi-r4-sd
 +bootconf_emmc=mt7988a-bananapi-bpi-r4-emmc
-+bootconf_extra=mt7988a-bananapi-bpi-r4-leds
++bootconf_extra=
 +bootdelay=0
 +bootfile=openwrt-mediatek-filogic-bananapi_bpi-r4-poe-initramfs-recovery.itb
 +bootfile_upg=openwrt-mediatek-filogic-bananapi_bpi-r4-poe-squashfs-sysupgrade.itb
@@ -1438,15 +1428,14 @@
 +_bootmenu_update_title=setenv _bootmenu_update_title ; setenv bootmenu_title "$bootmenu_title       [33m$ver[0m"
 --- /dev/null
 +++ b/defenvs/bananapi_bpi-r4-poe_snand_env
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,67 @@
 +ipaddr=192.168.1.1
 +serverip=192.168.1.254
 +loadaddr=0x50000000
 +bootargs=console=ttyS0,115200n1 pci=pcie_bus_perf root=/dev/fit0 rootwait ubi.block=0,fit
 +bootconf=config-mt7988a-bananapi-bpi-r4-poe
-+bootconf_extra=mt7988a-bananapi-bpi-r4-emmc#mt7988a-bananapi-bpi-r4-leds
-+bootcmd=run ledfix ; if pstore check ; then run boot_recovery ; else run boot_ubi ; fi
-+ledfix=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007
++bootconf_extra=mt7988a-bananapi-bpi-r4-emmc
++bootcmd=if pstore check ; then run boot_recovery ; else run boot_ubi ; fi
 +bootdelay=0
 +bootfile=openwrt-mediatek-filogic-bananapi_bpi-r4-poe-initramfs-recovery.itb
 +bootfile_bl2=openwrt-mediatek-filogic-bananapi_bpi-r4-poe-snand-preloader.bin

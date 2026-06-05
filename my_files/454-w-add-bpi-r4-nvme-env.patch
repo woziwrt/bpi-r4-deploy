@@ -5,7 +5,7 @@
  bootconf=config-mt7988a-bananapi-bpi-r4
  bootconf_extra=mt7988a-bananapi-bpi-r4-spim-nand#mt7988a-bananapi-bpi-r4-emmc
 -bootcmd=if pstore check ; then run boot_recovery ; else run boot_ubi ; fi
-+bootcmd=if env exists nvme_boot ; then run boot_nvme ; else if pstore check ; then run boot_recovery ; else run boot_ubi ; fi ; fi
++bootcmd=mdio write mt7988 0 1f.24 c007 ; mdio write mt7988 1 1f.24 c007 ; mdio write mt7988 2 1f.24 8007 ; mdio write mt7988 3 1f.24 8007 ; if env exists nvme_boot ; then run boot_nvme ; else if pstore check ; then run boot_recovery ; else run boot_ubi ; fi ; fi
  bootdelay=0
  bootfile=openwrt-mediatek-filogic-bananapi_bpi-r4-initramfs-recovery.itb
  bootfile_bl2=openwrt-mediatek-filogic-bananapi_bpi-r4-snand-preloader.bin

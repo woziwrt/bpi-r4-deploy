@@ -12,17 +12,19 @@
 #   LED1 (amber)  ON_CTRL 0x26  BLINK_CTRL 0x27
 # ON_CTRL  0x_007 = ENABLE | LINK1000 | LINK100 | LINK10   (on at link)
 # BLINK    0x003f = tx/rx blink on 10/100/1000             (activity)
-# Bit 0x4000 (POLARITY) is needed on all 4 ports (they are active-low) -
-# without it the LED is lit when there is NO link.
+# Bit 0x4000 (POLARITY) is needed on phy0/phy1/phy2 (active-low); phy3 is
+# active-high (no POLARITY). Wrong polarity lights the LED with NO link.
 # Only the green LED (LED0) is wired on the BPI-R4 - the amber/right LED
 # (LED1) net is NC on this board, so we configure led0 only.
 #
 # --- board-specific tunables (BPI-R4) ----------------------------------
 LED_ON_CTRL=0x24            # MMD 0x1f register: "LED on" control
 LED_BLINK_CTRL=0x25         # MMD 0x1f register: "LED blink" control
-LED_ON=0xc007               # on-at-link, POLARITY set (all 4 ports active-low)
+LED_ON_ACTIVE_LOW=0xc007    # on-at-link, POLARITY set  (phy0/phy1/phy2)
+LED_ON_ACTIVE_HIGH=0x8007   # on-at-link, no POLARITY   (phy3)
 LED_BLINK_TXRX=0x003f       # blink on tx/rx, all speeds
-PORTS="0 1 2 3"             # WAN, LAN1, LAN2, LAN3
+PORTS_ACTIVE_LOW="0 1 2"    # WAN, LAN1, LAN2
+PORTS_ACTIVE_HIGH="3"       # LAN3
 # -----------------------------------------------------------------------
 
 # Run early so the brief power-on "WAN/LAN1 lit" (inverted gphy default,
@@ -60,12 +62,17 @@ apply_leds() {
 	done
 
 	# Green LED0 = link + activity: on at link, blink on tx/rx.
-	# All 4 BPI-R4 LAN gphys are active-low, so the POLARITY bit (0xc007)
-	# is required on every port - without it the LED is lit when there is
-	# NO link (confirmed live on LAN2/LAN3).
+	# Per-port polarity is board-specific (confirmed live on the BPI-R4):
+	# phy0/phy1/phy2 are active-low (need POLARITY -> 0xc007), phy3 is
+	# active-high (no POLARITY -> 0x8007). Wrong polarity lights the LED
+	# when there is NO link.
 	local p
-	for p in $PORTS; do
-		mdio "$bus" mmd "$p:0x1f" raw "$LED_ON_CTRL"    "$LED_ON"
+	for p in $PORTS_ACTIVE_LOW; do
+		mdio "$bus" mmd "$p:0x1f" raw "$LED_ON_CTRL"    "$LED_ON_ACTIVE_LOW"
+		mdio "$bus" mmd "$p:0x1f" raw "$LED_BLINK_CTRL" "$LED_BLINK_TXRX"
+	done
+	for p in $PORTS_ACTIVE_HIGH; do
+		mdio "$bus" mmd "$p:0x1f" raw "$LED_ON_CTRL"    "$LED_ON_ACTIVE_HIGH"
 		mdio "$bus" mmd "$p:0x1f" raw "$LED_BLINK_CTRL" "$LED_BLINK_TXRX"
 	done
 }

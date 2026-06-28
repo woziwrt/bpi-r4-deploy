@@ -1,0 +1,9 @@
+--- a/drivers/net/phy/sfp.c
++++ b/drivers/net/phy/sfp.c
+@@ -XXX,XX +XXX,XX @@ static const struct sfp_quirk sfp_quirks[] = {
+ 	SFP_QUIRK_M("HUAWEI", "MA5671A", sfp_quirk_2500basex),
+ 	SFP_QUIRK_M("HUAWEI", "MA5671B", sfp_quirk_2500basex),
+ 	SFP_QUIRK_M("HUAWEI", "S-SFP-1G-T", sfp_quirk_2500basex),
++	SFP_QUIRK_M("BAZIS", "BZ-SFP-1G-T", sfp_quirk_2500basex),
+ 	{ }
+ };

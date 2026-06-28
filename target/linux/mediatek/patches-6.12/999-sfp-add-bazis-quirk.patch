@@ -1,5 +1,5 @@
---- /home/lotos6680/sfp.c.orig	2026-06-28 23:25:52.505133283 +0500
-+++ /home/lotos6680/sfp.c.modified	2026-06-28 23:38:15.458919359 +0500
+--- a/drivers/net/phy/sfp.c
++++ b/drivers/net/phy/sfp.c
 @@ -635,6 +635,7 @@
  	SFP_QUIRK_F("Turris", "RTSFP-10", sfp_fixup_rollball),
  	SFP_QUIRK_F("Turris", "RTSFP-10G", sfp_fixup_rollball),

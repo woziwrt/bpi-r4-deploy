@@ -1,9 +1,10 @@
---- a/drivers/net/phy/sfp.c
-+++ b/drivers/net/phy/sfp.c
-@@ -XXX,XX +XXX,XX @@ static const struct sfp_quirk sfp_quirks[] = {
- 	SFP_QUIRK_M("HUAWEI", "MA5671A", sfp_quirk_2500basex),
- 	SFP_QUIRK_M("HUAWEI", "MA5671B", sfp_quirk_2500basex),
- 	SFP_QUIRK_M("HUAWEI", "S-SFP-1G-T", sfp_quirk_2500basex),
+--- /home/lotos6680/sfp.c.orig	2026-06-28 23:25:52.505133283 +0500
++++ /home/lotos6680/sfp.c.modified	2026-06-28 23:38:15.458919359 +0500
+@@ -635,6 +635,7 @@
+ 	SFP_QUIRK_F("Turris", "RTSFP-10", sfp_fixup_rollball),
+ 	SFP_QUIRK_F("Turris", "RTSFP-10G", sfp_fixup_rollball),
+ 	SFP_QUIRK_F("JESS-LINK", "P60000BBC001-1", sfp_fixup_rollball),
 +	SFP_QUIRK_M("BAZIS", "BZ-SFP-1G-T", sfp_quirk_2500basex),
- 	{ }
  };
+ 
+ static size_t sfp_strlen(const char *str, size_t maxlen)

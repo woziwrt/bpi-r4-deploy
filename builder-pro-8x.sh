@@ -10,11 +10,12 @@ cd openwrt; git checkout ${OPENWRT_COMMIT:-949487e0900b92a87b5f5bc5db9861ce3480d
 git clone --branch git01 https://github.com/mediatek/mtk-openwrt-feeds mtk-openwrt-feeds
 ( cd mtk-openwrt-feeds && git checkout ${MTK_COMMIT:-42c9ff6569658fd5a71944e25f5fe7b4b4e21437} )
 
-\cp -r my_files/999-sfp-10-additional-quirks.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
-\cp -r my_files/999-sfp-11-rtl8261be-mdio-none.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
-\cp -r my_files/999-sfp-22-rtl8261be-boot-1g-reprobe.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+# Патчи для sfp.c – закомментированы, т.к. используется кастомный файл через files-6.12
+# \cp -r my_files/999-sfp-10-additional-quirks.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+# \cp -r my_files/999-sfp-11-rtl8261be-mdio-none.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+# \cp -r my_files/999-sfp-22-rtl8261be-boot-1g-reprobe.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-eth-21-mtk-gdm-rx-fsm-reset.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
-#\cp -r my_files/999-sfp-15-oem-sfp10gt-ignore-los.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+# \cp -r my_files/999-sfp-15-oem-sfp10gt-ignore-los.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-fix-00-xfrm-sw-sa-offload-ok.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 
 ### tx_power check Ivan Mironov's patch - for defective BE14 boards with defective eeprom flash
@@ -39,10 +40,18 @@ python3 -c 'f="target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"
 rm -f target/linux/mediatek/patches-6.12/999-eth-06-mtk_eth_soc-support-ethernet-passive-mux.patch
 # Remove upstream Frank-W DTS patch — we use Sinovoip-based DTS instead
 rm -f target/linux/mediatek/patches-6.12/046-v6.19-arm64-dts-mediatek-mt7988a-bpi-r4-pro-add-dts.patch
-\cp -r ../my_files/bpi-r4-pro/patches-kernel/* target/linux/mediatek/patches-6.12/
+
+# Копируем патчи для BPI-R4-Pro, исключая те, что правят sfp.c
+for patch_file in ../my_files/bpi-r4-pro/patches-kernel/*.patch; do
+    if [[ ! "$patch_file" =~ sfp ]]; then
+        cp "$patch_file" target/linux/mediatek/patches-6.12/
+    fi
+done
+
 # Copy custom sfp.c to override original
 mkdir -p target/linux/mediatek/files-6.12/drivers/net/phy
 cp ../my_files/bpi-r4-pro/sfp.c target/linux/mediatek/files-6.12/drivers/net/phy/
+
 \cp ../my_files/bpi-r4-pro/patches-uboot/471-add-bpi-r4-pro-8x.patch package/boot/uboot-mediatek/patches/
 #\cp ../my_files/bpi-r4-pro/patches-uboot/472-add-bpi-r4-pro-8x-makefile.patch package/boot/uboot-mediatek/patches/
 \cp ../my_files/bpi-r4-pro/uboot-mediatek-Makefile package/boot/uboot-mediatek/Makefile

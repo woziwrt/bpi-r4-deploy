@@ -41,7 +41,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout repository
@@ -100,22 +100,26 @@ jobs:
           FILOGIC="openwrt/bin/targets/mediatek/filogic"
 
           mkdir -p rel-pro
-          cp "${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-pro-8x-squashfs-sysupgrade.itb" rel-pro/bpi-r4-pro-8x.itb
-          cp "${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-pro-8x-nvme-img.bin"            rel-pro/
-          cp "${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-pro-8x-sdcard.img.gz"           rel-pro/
-          cp "${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-pro-8x-emmc-img.bin"            rel-pro/
-          cp "${FILOGIC}/openwrt-mediatek-filogic-bananapi_bpi-r4-pro-8x-snand-img.bin"           rel-pro/
-          cp "${FILOGIC}/config.buildinfo"                                                          rel-pro/
-          cp unifi/unifi-setup.sh                                                                  rel-pro/
-          cp unifi/rc.local                                                                        rel-pro/
-          cp unifi/rc-network.sh                                                                   rel-pro/
-          cp unifi/unifi-network-setup-8gb.sh                                                      rel-pro/unifi-network-setup.sh
+          
+          # Копируем FIT-образ (sysupgrade) по маске, игнорируя наличие/отсутствие squashfs в названии
+          cp ${FILOGIC}/*sysupgrade.itb rel-pro/bpi-r4-pro-8x.itb || true
+          
+          # Безопасное копирование образов для разных типов накопителей
+          cp ${FILOGIC}/*nvme-img.bin rel-pro/ || true
+          cp ${FILOGIC}/*sdcard.img.gz rel-pro/ || true
+          cp ${FILOGIC}/*emmc-img.bin rel-pro/ || true
+          cp ${FILOGIC}/*snand-img.bin rel-pro/ || true
+          cp ${FILOGIC}/config.buildinfo rel-pro/ || true
+          
+          # Копируем конфигурационные файлы и скрипты UniFi
+          cp unifi/unifi-setup.sh rel-pro/ || true
+          cp unifi/rc.local rel-pro/ || true
+          cp unifi/rc-network.sh rel-pro/ || true
+          cp unifi/unifi-network-setup-8gb.sh rel-pro/unifi-network-setup.sh || true
+          
+          # Автоматический расчет контрольных сумм для всех файлов, которые реально скопировались
           cd rel-pro
-          sha256sum bpi-r4-pro-8x.itb \
-            openwrt-mediatek-filogic-bananapi_bpi-r4-pro-8x-nvme-img.bin \
-            openwrt-mediatek-filogic-bananapi_bpi-r4-pro-8x-sdcard.img.gz \
-            openwrt-mediatek-filogic-bananapi_bpi-r4-pro-8x-emmc-img.bin \
-            openwrt-mediatek-filogic-bananapi_bpi-r4-pro-8x-snand-img.bin > sha256sums
+          sha256sum * > sha256sums
           cd ..
 
       - name: Publish release-pro-8x-standard

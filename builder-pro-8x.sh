@@ -23,7 +23,8 @@ git clone --branch git01 https://github.com/mediatek/mtk-openwrt-feeds mtk-openw
 
 cd openwrt
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic prepare
-
+# Удаляем все патчи для sfp.c, чтобы они не применились
+rm -f target/linux/mediatek/patches-6.12/*sfp*.patch
 # platform.sh: register bpi-r4-pro-8x in fit_do_upgrade, fit_check_image, platform_copy_config
 python3 -c 'f="target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"; c=open(f).read(); c=c.replace("\tbananapi,bpi-r4-lite|\\\n\tbazis,ax3000wm","\tbananapi,bpi-r4-lite|\\\n\tbananapi,bpi-r4-pro-8x|\\\n\tbazis,ax3000wm"); c=c.replace("\tbananapi,bpi-r4-lite|\\\n\tcmcc,rax3000m","\tbananapi,bpi-r4-lite|\\\n\tbananapi,bpi-r4-pro-8x|\\\n\tcmcc,rax3000m"); open(f,"w").write(c)'
 
@@ -119,6 +120,6 @@ echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-sdmmc-comb-4bg=y" >> .config
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-spim-nand-ubi-comb-4bg=y" >> .config
 
 # Удаляем все патчи, связанные с sfp.c, чтобы они не конфликтовали с кастомным файлом
-rm -f target/linux/mediatek/patches-6.12/*sfp*.patch
+#rm -f target/linux/mediatek/patches-6.12/*sfp*.patch
 
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic build

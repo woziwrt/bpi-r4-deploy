@@ -40,6 +40,9 @@ rm -f target/linux/mediatek/patches-6.12/999-eth-06-mtk_eth_soc-support-ethernet
 # Remove upstream Frank-W DTS patch — we use Sinovoip-based DTS instead
 rm -f target/linux/mediatek/patches-6.12/046-v6.19-arm64-dts-mediatek-mt7988a-bpi-r4-pro-add-dts.patch
 \cp -r ../my_files/bpi-r4-pro/patches-kernel/* target/linux/mediatek/patches-6.12/
+# Copy custom sfp.c to override original
+mkdir -p target/linux/mediatek/files-6.12/drivers/net/phy
+cp ../my_files/bpi-r4-pro/sfp.c target/linux/mediatek/files-6.12/drivers/net/phy/
 \cp ../my_files/bpi-r4-pro/patches-uboot/471-add-bpi-r4-pro-8x.patch package/boot/uboot-mediatek/patches/
 #\cp ../my_files/bpi-r4-pro/patches-uboot/472-add-bpi-r4-pro-8x-makefile.patch package/boot/uboot-mediatek/patches/
 \cp ../my_files/bpi-r4-pro/uboot-mediatek-Makefile package/boot/uboot-mediatek/Makefile

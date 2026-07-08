@@ -369,6 +369,7 @@ if [ -n "$MOUNTED" ]; then
 fi
 
 printf "        Wiping NVMe disk...\n"
+sgdisk --zap-all "$NVME_DEV" 2>/dev/null || true
 wipefs -a "$NVME_DEV" 2>/dev/null || true
 dd if=/dev/zero of="$NVME_DEV" bs=1M count=100 conv=fsync
 sync

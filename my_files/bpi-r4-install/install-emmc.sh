@@ -215,6 +215,12 @@ if [ "$CONFIRM" != "YES" ]; then
 fi
 
 printf "\n"
+printf "        Wiping disk (stale GPT + fs signatures)...\n"
+sgdisk --zap-all "$EMMC_DEV" 2>/dev/null || true
+wipefs -a "$EMMC_DEV" 2>/dev/null || true
+dd if=/dev/zero of="$EMMC_DEV" bs=1M count=100 conv=fsync
+sync
+printf "        OK -- disk wiped\n\n"
 printf "        Writing image to %s...\n" "$EMMC_DEV"
 dd if="$EMMC_IMG" of="$EMMC_DEV" bs=1M conv=fsync
 if [ $? -ne 0 ]; then

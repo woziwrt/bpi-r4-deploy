@@ -326,6 +326,12 @@ if [ -n "$MOUNTED" ]; then
     done
 fi
 
+printf "        Wiping disk (stale GPT + fs signatures)...\n"
+sgdisk --zap-all "$NVME_DEV" 2>/dev/null || true
+wipefs -a "$NVME_DEV" 2>/dev/null || true
+dd if=/dev/zero of="$NVME_DEV" bs=1M count=100 conv=fsync
+sync
+printf "        OK -- disk wiped\n\n"
 printf "        Writing partition layout (nvme-img.bin)...\n"
 dd if="$IMG" of="$NVME_DEV" bs=1M conv=fsync
 if [ $? -ne 0 ]; then

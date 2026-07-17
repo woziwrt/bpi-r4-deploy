@@ -149,6 +149,12 @@ endif
 
 endef
 
+# $(1): U-Boot FIP base name (bananapi_bpi-r4 or bananapi_bpi-r4-poe).
+# Passed as a call argument on purpose: a shared make variable here — even a
+# DEVICE_VARS-registered one — is captured from the previously parsed device
+# during template expansion, which shipped poe-8gb images with the non-PoE
+# U-Boot env (bootconf mismatch -> TFTP boot loop). Call args substitute
+# textually and cannot leak between devices.
 define Device/bananapi_bpi-r4-common-8gb
   DEVICE_VENDOR := Bananapi
   DEVICE_DTS_DIR := $(DTS_DIR)/
@@ -166,7 +172,6 @@ mt7988a-bananapi-bpi-r4-nvme
   DEVICE_COMPAT_VERSION := 1.1
   DEVICE_COMPAT_MESSAGE := The non-switch ports were renamed to match the board/case labels
   KERNEL_LOADADDR := 0x46000000
-  BPI_R4_FIP_NAME := bananapi_bpi-r4
 
   ARTIFACTS := \
       emmc-img.bin \
@@ -175,7 +180,7 @@ mt7988a-bananapi-bpi-r4-nvme
       snand-img.bin
   ARTIFACT/emmc-img.bin := mt798x-gpt emmc | \
   pad-to 17k | mt7988-bl2 emmc-comb-4bg | \
-  pad-to 6656k | mt7988-bl31-uboot $$(BPI_R4_FIP_NAME)-emmc | \
+  pad-to 6656k | mt7988-bl31-uboot $(1)-emmc | \
   pad-to 64M | append-image squashfs-sysupgrade.itb
   ARTIFACT/nvme-img.bin := mt798x-gpt-nvme | \
   pad-to 512M | append-image squashfs-sysupgrade.itb
@@ -184,11 +189,11 @@ mt7988a-bananapi-bpi-r4-nvme
   ubinize-image fit squashfs-sysupgrade.itb
   ARTIFACT/sdcard.img.gz := mt798x-gpt sdmmc |\
   pad-to 17k | mt7988-bl2 sdmmc-comb-4bg |\
-  pad-to 6656k | mt7988-bl31-uboot $$(BPI_R4_FIP_NAME)-sdmmc |\
+  pad-to 6656k | mt7988-bl31-uboot $(1)-sdmmc |\
   pad-to 44M | mt7988-bl2 spim-nand-ubi-comb-4bg |\
-  pad-to 45M | mt7988-bl31-uboot $$(BPI_R4_FIP_NAME)-snand |\
+  pad-to 45M | mt7988-bl31-uboot $(1)-snand |\
   pad-to 51M | mt7988-bl2 emmc-comb-4bg |\
-  pad-to 52M | mt7988-bl31-uboot $$(BPI_R4_FIP_NAME)-emmc |\
+  pad-to 52M | mt7988-bl31-uboot $(1)-emmc |\
   pad-to 56M | mt798x-gpt emmc |\
 $(if $(CONFIG_TARGET_ROOTFS_SQUASHFS),\
   pad-to 64M | append-image squashfs-sysupgrade.itb | check-size |\
@@ -236,7 +241,7 @@ define Device/bananapi_bpi-r4-8gb
   DEVICE_MODEL := BPi-R4 8GB
   DEVICE_DTS := mt7988a-bananapi-bpi-r4
   DEVICE_DTS_CONFIG := config-mt7988a-bananapi-bpi-r4
-  $(call Device/bananapi_bpi-r4-common-8gb)
+  $(call Device/bananapi_bpi-r4-common-8gb,bananapi_bpi-r4)
   ARTIFACTS := emmc-img.bin nvme-img.bin sdcard.img.gz
   DEVICE_PACKAGES += docker dockerd docker-compose containerd runc
   SUPPORTED_DEVICES += bananapi,bpi-r4
@@ -247,12 +252,11 @@ define Device/bananapi_bpi-r4-poe-8gb
   DEVICE_MODEL := BPi-R4 2.5GE 8GB
   DEVICE_DTS := mt7988a-bananapi-bpi-r4-2g5
   DEVICE_DTS_CONFIG := config-mt7988a-bananapi-bpi-r4-poe
-  $(call Device/bananapi_bpi-r4-common-8gb)
+  $(call Device/bananapi_bpi-r4-common-8gb,bananapi_bpi-r4-poe)
   DEVICE_PACKAGES += mt798x-2p5g-phy-firmware-internal kmod-mt798x-2p5g-phy
   DEVICE_PACKAGES += docker dockerd docker-compose containerd runc
   ARTIFACTS := emmc-img.bin nvme-img.bin sdcard.img.gz
   SUPPORTED_DEVICES += bananapi,bpi-r4-2g5
-  BPI_R4_FIP_NAME := bananapi_bpi-r4-poe
   UBINIZE_PARTS := fip=:$(STAGING_DIR_IMAGE)/mt7988_bananapi_bpi-r4-poe-snand-u-boot.fip
 endef
 TARGET_DEVICES += bananapi_bpi-r4-poe-8gb
@@ -273,7 +277,7 @@ define Device/bananapi_bpi-r4-nand-8gb
   DEVICE_MODEL := BPi-R4 NAND installer 8GB
   DEVICE_DTS := mt7988a-bananapi-bpi-r4
   DEVICE_DTS_CONFIG := config-mt7988a-bananapi-bpi-r4
-  $(call Device/bananapi_bpi-r4-common-8gb)
+  $(call Device/bananapi_bpi-r4-common-8gb,bananapi_bpi-r4)
   ARTIFACTS := snand-img.bin
 endef
 TARGET_DEVICES += bananapi_bpi-r4-nand-8gb

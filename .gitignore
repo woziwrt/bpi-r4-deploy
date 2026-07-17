@@ -17,3 +17,6 @@ my_files/luci-app-wifimgr/wifimgr-capability-analysis.md
 my_files/luci-app-wifimgr/docs/forum_reply_cookiemonster_post6.md
 my_files/luci-app-wifimgr/docs/mtk_dev_message.md
 my_files/luci-app-wifimgr/docs/test-results-*.md
+
+# local Docker builds (see local-build.sh) — huge build trees, never commit
+/local-build/

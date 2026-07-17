@@ -508,3 +508,7 @@ CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_bananapi_bpi-r4-nand=y
 CONFIG_TARGET_DEVICE_PACKAGES_mediatek_filogic_DEVICE_bananapi_bpi-r4-nand=""
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_bananapi_bpi-r4-nand-8gb=y
 CONFIG_TARGET_DEVICE_PACKAGES_mediatek_filogic_DEVICE_bananapi_bpi-r4-nand-8gb=""
+
+# build initramfs recovery images (embedded in sdcard.img recovery partition + TFTP failsafe)
+CONFIG_TARGET_ROOTFS_INITRAMFS=y
+CONFIG_TARGET_INITRAMFS_COMPRESSION_XZ=y

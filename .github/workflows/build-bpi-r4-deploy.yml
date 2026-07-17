@@ -103,7 +103,7 @@ jobs:
           FILOGIC="openwrt/bin/targets/mediatek/filogic"
 
           # Prepare artifact directory for one release tag
-          # Args: dir, itb_src, itb_dst, nvme, sdcard, emmc, snand
+          # Args: dir, itb_src, itb_dst, nvme, sdcard, emmc, snand [, recovery_itb]
           make_release_dir() {
             local DIR="$1"
             local ITB_SRC="$2"
@@ -112,6 +112,7 @@ jobs:
             local SDCARD="$5"
             local EMMC="$6"
             local SNAND="$7"
+            local RECOVERY="${8:-}"
 
             mkdir -p "$DIR"
             cp "${FILOGIC}/${ITB_SRC}"   "${DIR}/${ITB_DST}"
@@ -119,9 +120,10 @@ jobs:
             cp "${FILOGIC}/${SDCARD}"    "${DIR}/${SDCARD}"
             cp "${FILOGIC}/${EMMC}"      "${DIR}/${EMMC}"
             cp "${FILOGIC}/${SNAND}"     "${DIR}/${SNAND}"
+            [ -n "$RECOVERY" ] && cp "${FILOGIC}/${RECOVERY}" "${DIR}/${RECOVERY}"
             cp "${FILOGIC}/config.buildinfo" "${DIR}/"
             cd "$DIR"
-            sha256sum "${ITB_DST}" "${NVME}" "${SDCARD}" "${EMMC}" "${SNAND}" > sha256sums
+            sha256sum "${ITB_DST}" "${NVME}" "${SDCARD}" "${EMMC}" "${SNAND}" ${RECOVERY} > sha256sums
             cd ..
           }
 
@@ -134,7 +136,8 @@ jobs:
               "openwrt-mediatek-filogic-bananapi_bpi-r4-nvme-img.bin" \
               "openwrt-mediatek-filogic-bananapi_bpi-r4-sdcard.img.gz" \
               "openwrt-mediatek-filogic-bananapi_bpi-r4-emmc-img.bin" \
-              "openwrt-mediatek-filogic-bananapi_bpi-r4-nand-snand-img.bin"
+              "openwrt-mediatek-filogic-bananapi_bpi-r4-nand-snand-img.bin" \
+              "openwrt-mediatek-filogic-bananapi_bpi-r4-initramfs-recovery.itb"
 
             # 4GB PoE
             make_release_dir rel-4gb-poe \
@@ -143,7 +146,8 @@ jobs:
               "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-nvme-img.bin" \
               "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-sdcard.img.gz" \
               "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-emmc-img.bin" \
-              "openwrt-mediatek-filogic-bananapi_bpi-r4-nand-snand-img.bin"
+              "openwrt-mediatek-filogic-bananapi_bpi-r4-nand-snand-img.bin" \
+              "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-initramfs-recovery.itb"
 
             # 8GB non-poe
             make_release_dir rel-8gb \
@@ -152,7 +156,8 @@ jobs:
               "openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-nvme-img.bin" \
               "openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-sdcard.img.gz" \
               "openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-emmc-img.bin" \
-              "openwrt-mediatek-filogic-bananapi_bpi-r4-nand-8gb-snand-img.bin"
+              "openwrt-mediatek-filogic-bananapi_bpi-r4-nand-8gb-snand-img.bin" \
+              "openwrt-mediatek-filogic-bananapi_bpi-r4-8gb-initramfs-recovery.itb"
 
             # 8GB PoE
             make_release_dir rel-8gb-poe \
@@ -161,7 +166,8 @@ jobs:
               "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-nvme-img.bin" \
               "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-sdcard.img.gz" \
               "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-emmc-img.bin" \
-              "openwrt-mediatek-filogic-bananapi_bpi-r4-nand-8gb-snand-img.bin"
+              "openwrt-mediatek-filogic-bananapi_bpi-r4-nand-8gb-snand-img.bin" \
+              "openwrt-mediatek-filogic-bananapi_bpi-r4-poe-8gb-initramfs-recovery.itb"
           fi
 
           # Pro variants

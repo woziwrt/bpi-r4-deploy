@@ -1,5 +1,5 @@
 #!/bin/sh
-# mlo-steerd v0.4 - MLO Link Steering Daemon + Neg-TTLM + R-TWT
+# mlo-steerd v0.5 - MLO Link Steering Daemon + Neg-TTLM + R-TWT
 #
 # Steering algorithm (per-link):
 #   Hard disable : SNR < SNR_HARD_LOW (ignore other params)
@@ -10,6 +10,14 @@
 #                  score in between      → no change (hysteresis)
 #   Cooldown     : min COOLDOWN_S seconds between ATTLM actions
 #
+# A-TTLM lifecycle (v0.5): hostapd refuses a new set_attlm while one is
+# active ("Busy: A-TTLM is on-going") and offers no early cancel, so a
+# disable is issued ONCE per ATTLM_DURATION block. When the block expires
+# the links come back on their own and the next loop re-measures REAL SNR
+# on the re-enabled link — that expiry IS the re-enable probe. v0.4 instead
+# re-issued the mask every 10 s (rejected → Busy flood) and required valid
+# SNR on a link it had itself emptied of clients (re-enable never fired).
+#
 # R-TWT groups (WiFi 7 R2, recommendation=4):
 #   Group 1 (Voice): TID 6+7, ~524ms interval — guaranteed time slot for VoIP
 #   Group 2 (Video): TID 4+5, ~262ms interval — guaranteed time slot for video
@@ -18,7 +26,8 @@
 
 MLO_IF="ap-mld-1"
 INTERVAL=10
-ATTLM_DURATION=25000   # ms, must be > INTERVAL*1000 with margin
+ATTLM_DURATION=300000  # ms per disable block; expiry doubles as re-enable probe
+ATTLM_DUR_S=$(( ATTLM_DURATION / 1000 ))
 
 # Hard gates (dB)
 SNR_HARD_LOW_6=2       # force disable 6G below this
@@ -30,8 +39,9 @@ SNR_HARD_HIGH_5=15
 SCORE_DISABLE=4000
 SCORE_ENABLE=6000
 
-# Retries confirmation for hard enable
-RETRIES_CONFIRM=15     # % max retries to confirm enable
+# Retries confirmation for hard enable (% of the last interval, not lifetime)
+RETRIES_CONFIRM=15
+RETRIES_MIN_PKTS=20    # need at least this many tx in the interval to trust %
 
 # Cooldown between ATTLM actions (seconds)
 COOLDOWN_S=30
@@ -41,20 +51,40 @@ RTWT_ENABLED=1
 RTWT_VOICE_ID=1     # Voice TIDs 6+7, mantissa=255, exponent=4096 → ~524ms interval
 RTWT_VIDEO_ID=2     # Video TIDs 4+5, mantissa=128, exponent=2048 → ~262ms interval
 RTWT_CHECK_INTERVAL=6  # re-verify groups every N main loop iterations
-
-# Link → frequency mapping
-FREQ_L0=2462
-FREQ_L1=5180
-FREQ_L2=6135
+RTWT_MAX_FAILS=3       # consecutive create failures before giving up for good
 
 LOG_FILE=/tmp/steerd.log
 LOG_MAX=200
+
+# Events: file + syslog. Periodic status: file only (keeps logread readable).
 log() {
-    local msg="$(date '+%H:%M:%S') [steerd] $*"
-    echo "$msg" >> "$LOG_FILE"
+    echo "$(date '+%H:%M:%S') [steerd] $*" >> "$LOG_FILE"
     logger -t mlo-steerd "$*"
+    log_trim
+}
+status_log() {
+    echo "$(date '+%H:%M:%S') [steerd] $*" >> "$LOG_FILE"
+    log_trim
+}
+log_trim() {
     local lines; lines=$(wc -l < "$LOG_FILE")
     [ "$lines" -gt "$LOG_MAX" ] && tail -n "$LOG_MAX" "$LOG_FILE" > "${LOG_FILE}.tmp" && mv "${LOG_FILE}.tmp" "$LOG_FILE"
+}
+
+# Refresh FREQ_L0/1/2 from the live MLD links (channels move: DFS, reconfig).
+# v0.4 hardcoded them, silently breaking SNR/busy lookups after any change.
+update_link_freqs() {
+    local out lid f
+    out=$(iw dev "$MLO_IF" info 2>/dev/null)
+    for lid in 0 1 2; do
+        f=$(echo "$out" | awk -v lid="$lid" '
+            /- link ID/ { cur = ($4 == lid) }
+            cur && /channel / {
+                s=$0; sub(/.*channel [0-9]+ \(/,"",s); sub(/ MHz.*/,"",s)
+                print s+0; exit
+            }')
+        [ -n "$f" ] && [ "$f" -gt 0 ] && eval "FREQ_L$lid=$f"
+    done
 }
 
 # Get noise floor (dBm) for a frequency
@@ -81,13 +111,12 @@ busy_at() {
     '
 }
 
-# Get aggregate tx retries % across all connected clients
-retries_pct() {
+# Lifetime tx totals across all clients: "packets retries"
+tx_totals() {
     iw dev "$MLO_IF" station dump 2>/dev/null | awk '
         /tx packets:/ { total += $NF }
         /tx retries:/ { retries += $NF }
-        END { if (total > 0) printf "%d", (retries * 100) / total; else print "0" }
-    '
+        END { printf "%d %d", total+0, retries+0 }'
 }
 
 # Get minimum RSSI for a link_id (returns "none" if link idle)
@@ -139,7 +168,7 @@ get_mlmr_macs() {
     '
 }
 
-# Print one log line per connected client
+# Print one log line per connected client (file only)
 log_clients() {
     local mask="$1"
     local snr0="$2" snr1="$3" snr2="$4"
@@ -186,7 +215,7 @@ log_clients() {
         ttlm = (mac in has_ttlm) ? "  TTLM:active" : ""
         printf "%s  %-9s %-5s %s%s\n", prefix, short, type, info, ttlm
     }
-'
+' >> "$LOG_FILE"
 }
 
 # Apply Neg-TTLM for MLMR client
@@ -214,31 +243,43 @@ neg_ttlm_teardown() {
     hostapd_cli -i "$MLO_IF" negotiated_ttlm teardown "$1" >/dev/null 2>&1
 }
 
-# Check if R-TWT group id exists in current AP state
+# Check if R-TWT group id exists in current AP state.
+# get_btwt prints entries as "id=N min_wake_dur=..." (v0.4 grepped for
+# "btwt_id=" which never matches → groups were re-added forever).
 btwt_exists() {
-    hostapd_cli -i "$MLO_IF" get_btwt 2>/dev/null | grep -q "btwt_id=$1 "
+    hostapd_cli -i "$MLO_IF" get_btwt 2>/dev/null | grep -qE "(^| )id=$1 "
 }
 
-# Create R-TWT groups if missing. First add_btwt call may timeout (known FW delay)
-# but succeeds; a second call with same id returns FAIL (slot occupied) — that is OK.
+# Create R-TWT groups if missing. Gives up for the session after
+# RTWT_MAX_FAILS consecutive failed creates (driver/FW without btwt support
+# otherwise gets hammered with a failing add_btwt every minute).
+RTWT_FAILS=0
 btwt_ensure() {
     [ "$RTWT_ENABLED" -eq 0 ] && return
-    local changed=0
+    local missing=0
     if ! btwt_exists "$RTWT_VOICE_ID"; then
         hostapd_cli -i "$MLO_IF" add_btwt "$RTWT_VOICE_ID" 255 4096 7 \
             recommendation=4 dl_tid_bitmap=0xC0 ul_tid_bitmap=0xC0 >/dev/null 2>&1
-        log "R-TWT: created Voice group id=$RTWT_VOICE_ID (TID 6+7, ~524ms)"
-        changed=1
+        missing=1
     fi
     if ! btwt_exists "$RTWT_VIDEO_ID"; then
         hostapd_cli -i "$MLO_IF" add_btwt "$RTWT_VIDEO_ID" 128 2048 7 \
             recommendation=4 dl_tid_bitmap=0x30 ul_tid_bitmap=0x30 >/dev/null 2>&1
-        log "R-TWT: created Video group id=$RTWT_VIDEO_ID (TID 4+5, ~262ms)"
-        changed=1
+        missing=1
     fi
-    [ "$changed" -eq 0 ] && return
-    # Give FW a moment to register the groups in beacon
+    [ "$missing" -eq 0 ] && { RTWT_FAILS=0; return; }
+    # Give FW a moment to register the groups in beacon, then verify
     sleep 1
+    if btwt_exists "$RTWT_VOICE_ID" && btwt_exists "$RTWT_VIDEO_ID"; then
+        log "R-TWT: groups ready (Voice id=$RTWT_VOICE_ID ~524ms, Video id=$RTWT_VIDEO_ID ~262ms)"
+        RTWT_FAILS=0
+    else
+        RTWT_FAILS=$(( RTWT_FAILS + 1 ))
+        if [ "$RTWT_FAILS" -ge "$RTWT_MAX_FAILS" ]; then
+            RTWT_ENABLED=0
+            log "R-TWT: create failed ${RTWT_FAILS}x — driver refuses, disabling for this session"
+        fi
+    fi
 }
 
 # Return R-TWT status string for log ("V+D" / "V" / "D" / "none")
@@ -256,7 +297,7 @@ btwt_status() {
 
 # --- main ---
 
-log "Started v0.4: if=$MLO_IF interval=${INTERVAL}s algo=weighted(SNR60+RET30+BUSY10) cooldown=${COOLDOWN_S}s rtwt=${RTWT_ENABLED}"
+log "Started v0.5: if=$MLO_IF interval=${INTERVAL}s algo=weighted(SNR60+RET30+BUSY10) cooldown=${COOLDOWN_S}s attlm_block=${ATTLM_DUR_S}s rtwt=${RTWT_ENABLED}"
 log "Override: set via 'uci set mlo-steerd.global.mode=auto|all_on|5g_only && uci commit mlo-steerd'"
 
 WANT_DISABLE_6=0
@@ -264,6 +305,16 @@ WANT_DISABLE_5=0
 NEG_TTLM_MACS=""
 LAST_ACTION=0
 RTWT_LOOP_CTR=0
+LAST_MASK_SENT=0       # mask of the currently advertised A-TTLM (0 = none)
+ATTLM_SET_AT=0         # epoch when it was issued
+RET=0
+# Seed the counters so the first interval isn't computed against zero
+# (that would make iteration one see the lifetime ratio again)
+set -- $(tx_totals)
+PREV_TX=$1; PREV_RETR=$2
+
+FREQ_L0=""; FREQ_L1=""; FREQ_L2=""
+update_link_freqs
 
 # Create R-TWT groups on startup
 btwt_ensure
@@ -275,18 +326,30 @@ while true; do
     if [ "$CLIENTS" -eq 0 ]; then
         for _mac in $NEG_TTLM_MACS; do neg_ttlm_teardown "$_mac"; done
         NEG_TTLM_MACS=""
-        log "No clients — idle"
+        status_log "No clients — idle"
         sleep "$INTERVAL"
         continue
     fi
 
-    # Collect inputs
+    # Collect inputs (frequencies first — they move on DFS events/reconfig)
+    update_link_freqs
     N0=$(noise_at $FREQ_L0); N1=$(noise_at $FREQ_L1); N2=$(noise_at $FREQ_L2)
     R0=$(min_rssi 0);        R1=$(min_rssi 1);        R2=$(min_rssi 2)
-    RET=$(retries_pct)
     BUSY2=$(busy_at $FREQ_L2); BUSY1=$(busy_at $FREQ_L1)
     [ -z "$BUSY2" ] && BUSY2=0
     [ -z "$BUSY1" ] && BUSY1=0
+
+    # Per-interval retries % from lifetime counter deltas. v0.4 used the
+    # lifetime ratio, which never decays and wedged the enable gate.
+    set -- $(tx_totals)
+    TX_NOW=$1; RETR_NOW=$2
+    DT=$(( TX_NOW - PREV_TX )); DR=$(( RETR_NOW - PREV_RETR ))
+    if [ "$DT" -ge "$RETRIES_MIN_PKTS" ] && [ "$DR" -ge 0 ]; then
+        RET=$(( DR * 100 / DT ))
+    else
+        RET=0   # too few samples (or counter reset on reconnect) — don't gate on noise
+    fi
+    PREV_TX=$TX_NOW; PREV_RETR=$RETR_NOW
 
     # Compute SNR per-link
     SNR0_S="n/a"; SNR1_S="n/a"; SNR2_S="n/a"
@@ -298,6 +361,15 @@ while true; do
 
     NOW=$(date +%s)
     COOLDOWN_OK=$(( NOW - LAST_ACTION >= COOLDOWN_S ))
+
+    # A-TTLM expiry: links are back on air; re-measure instead of latching.
+    # The fresh (genuinely observed) SNR decides whether to disable again.
+    if [ "$LAST_MASK_SENT" -gt 0 ] && [ $(( NOW - ATTLM_SET_AT )) -ge "$ATTLM_DUR_S" ]; then
+        log "A-TTLM block (mask=$LAST_MASK_SENT) expired — links re-enabled, probing"
+        LAST_MASK_SENT=0
+        WANT_DISABLE_6=0
+        WANT_DISABLE_5=0
+    fi
 
     # --- Override mode (UCI mlo-steerd.global.mode) ---
     MODE=$(uci -q get mlo-steerd.global.mode 2>/dev/null)
@@ -324,7 +396,8 @@ while true; do
                 fi
             fi
         else
-            # Check for enable
+            # Check for enable (only reachable while no A-TTLM is advertised,
+            # e.g. WANT set during this block before cooldown allowed sending)
             if [ "$SNR2" -gt "$SNR_HARD_HIGH_6" ] && [ "$RET" -lt "$RETRIES_CONFIRM" ]; then
                 WANT_DISABLE_6=0; LAST_ACTION=$NOW
                 log "6G: SNR=${SNR2}dB > hard_high=${SNR_HARD_HIGH_6}dB ret=${RET}% → HARD ENABLE"
@@ -375,15 +448,39 @@ while true; do
     if [ "$MASK" -gt 0 ]; then
         for _mac in $NEG_TTLM_MACS; do neg_ttlm_teardown "$_mac"; done
         NEG_TTLM_MACS=""
-        attlm_set "$MASK"
-        STATUS="ATTLM mask=$MASK | ret=${RET}% busy6G=${BUSY2}% busy5G=${BUSY1}%"
+        if [ "$LAST_MASK_SENT" -eq 0 ]; then
+            # No A-TTLM on air — advertise this block once
+            if attlm_set "$MASK"; then
+                LAST_MASK_SENT=$MASK
+                ATTLM_SET_AT=$NOW
+                log "A-TTLM: advertised mask=$MASK for ${ATTLM_DUR_S}s"
+            fi
+        elif [ "$MASK" -ne "$LAST_MASK_SENT" ]; then
+            # hostapd can't update an active A-TTLM — apply on next expiry
+            status_log "A-TTLM: mask change $LAST_MASK_SENT→$MASK deferred until current block expires"
+        fi
+        STATUS="ATTLM mask=$LAST_MASK_SENT want=$MASK | ret=${RET}% busy6G=${BUSY2}% busy5G=${BUSY1}%"
     else
+        # All links up. Neg-TTLM only for NEW MLMR clients (v0.4 re-negotiated
+        # with every client every 10 s over the air).
         ACTIVE_MASK=7
-        NEW_NEG_MACS=""
-        for _mac in $MLMR_MACS; do
-            neg_ttlm_set "$_mac" "$ACTIVE_MASK" && NEW_NEG_MACS="${NEW_NEG_MACS} ${_mac}"
+        KEPT_MACS=""
+        for _mac in $NEG_TTLM_MACS; do
+            case " $MLMR_MACS " in
+                *" $_mac "*) KEPT_MACS="${KEPT_MACS} ${_mac}" ;;
+                *) neg_ttlm_teardown "$_mac" ;;   # client left
+            esac
         done
-        NEG_TTLM_MACS="$NEW_NEG_MACS"
+        NEG_TTLM_MACS="$KEPT_MACS"
+        for _mac in $MLMR_MACS; do
+            case " $NEG_TTLM_MACS " in
+                *" $_mac "*) ;;   # already configured
+                *) if neg_ttlm_set "$_mac" "$ACTIVE_MASK"; then
+                       NEG_TTLM_MACS="${NEG_TTLM_MACS} ${_mac}"
+                       log "Neg-TTLM: configured $_mac"
+                   fi ;;
+            esac
+        done
         STATUS="all links up | ret=${RET}% busy6G=${BUSY2}% busy5G=${BUSY1}%"
     fi
 
@@ -394,9 +491,9 @@ while true; do
     fi
     RTWT_ST=$(btwt_status)
 
-    # --- Per-client log ---
+    # --- Per-client log (file only) ---
     log_clients "$MASK" "$SNR0_S" "$SNR1_S" "$SNR2_S" "$NEG_TTLM_MACS" "$MLMR_MACS"
-    log "$STATUS | R-TWT:$RTWT_ST"
+    status_log "$STATUS | R-TWT:$RTWT_ST"
 
     sleep "$INTERVAL"
 done

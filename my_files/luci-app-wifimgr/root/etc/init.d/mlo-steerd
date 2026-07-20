@@ -1,18 +1,16 @@
 #!/bin/sh /etc/rc.common
 
-# Disabled by default: the v0.4 steering algorithm can latch a link into a
-# permanent A-TTLM disable/re-arm loop (the re-enable check needs client SNR
-# on the very link it disabled), and the resulting link flapping breaks SAE
-# re-auth on MLO clients ("wrong password" on Android). Start it from the
-# wifimgr UI, or opt in to autostart with:
-#   uci set mlo-steerd.global.autostart=1 && uci commit mlo-steerd
+# Autostarts by default since the v0.5 rewrite (one A-TTLM per 300 s block,
+# expiry doubles as the re-enable probe — the v0.4 disable/re-arm latch that
+# broke SAE re-auth on MLO clients is gone). Opt out with:
+#   uci set mlo-steerd.global.autostart=0 && uci commit mlo-steerd
 
 START=95
 STOP=10
 USE_PROCD=1
 
 autostart_enabled() {
-    [ "$(uci -q get mlo-steerd.global.autostart)" = "1" ]
+    [ "$(uci -q get mlo-steerd.global.autostart)" != "0" ]
 }
 
 start_service() {

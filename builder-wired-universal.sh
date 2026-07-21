@@ -66,6 +66,12 @@ chmod +x files/etc/init.d/mtk-led-fix
 \cp ../my_files/etc-files/uci-defaults/95-mtk-led-fix-enable files/etc/uci-defaults/
 chmod +x files/etc/uci-defaults/95-mtk-led-fix-enable
 
+# WAN on the 2.5GbE/PoE jack: stock defaults bridge that port ("lan4") into
+# br-lan, so an uplink plugged there links up but never gets a WAN lease;
+# move it to br-wan (bpi-r4-2g5/poe boards only, no-op elsewhere)
+\cp ../my_files/etc-files/uci-defaults/98-poe-wan-port files/etc/uci-defaults/
+chmod +x files/etc/uci-defaults/98-poe-wan-port
+
 # SD auto-expand: grow production + fitrw f2fs to fill the SD card on first boot (SD-only, guarded)
 mkdir -p files/lib/preinit
 \cp ../my_files/etc-files/lib/preinit/19-expand-fit-rootfs files/lib/preinit/

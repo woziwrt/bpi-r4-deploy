@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# BPI-R4 2.5GbE variants (bpi-r4-2g5 / bpi-r4-poe): the 2.5GbE RJ45 jack -
+# the PoE-in uplink port on the PoE board - enumerates as "lan4", and the
+# stock OpenWrt defaults bridge it into br-lan. An uplink cable plugged
+# there shows link but gets bridged into the LAN: the router never asks
+# for a WAN lease and has no internet (seen live 2026-07-21). Move the
+# port to br-wan so any copper uplink jack (wan, sfp-wan or 2.5G/PoE)
+# works as WAN. Idempotent: also migrates configs preserved by sysupgrade.
+
+. /lib/functions.sh
+
+case "$(board_name)" in
+bananapi,bpi-r4-2g5|\
+bananapi,bpi-r4-poe) ;;
+*) exit 0 ;;
+esac
+
+lan_sec="" wan_sec=""
+find_bridge() {
+	local name
+	config_get name "$1" name
+	case "$name" in
+	br-lan) lan_sec="$1" ;;
+	br-wan) wan_sec="$1" ;;
+	esac
+}
+config_load network
+config_foreach find_bridge device
+[ -n "$lan_sec" ] && [ -n "$wan_sec" ] || exit 0
+
+uci -q del_list "network.$lan_sec.ports=lan4"
+uci -q get "network.$wan_sec.ports" | grep -qw lan4 || \
+	uci add_list "network.$wan_sec.ports=lan4"
+uci commit network
+exit 0

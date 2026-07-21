@@ -1,5 +1,7 @@
 #!/bin/sh /etc/rc.common
-# WiFi Manager first-boot defaults: country + factory SSID password/encryption.
+# WiFi Manager first-boot defaults: country + factory SSID encryption, secured
+# with a per-device random password (read it via LuCI or
+# "uci get wireless.<iface>.key" over the wired LAN).
 #
 # Why an init.d and not /etc/uci-defaults:
 # uci-defaults run very early, BEFORE config_generate has created
@@ -36,13 +38,25 @@ boot() {
 	uci set wireless.radio1.country='CZ'
 	uci set wireless.radio2.country='CZ'
 
-	# On factory interfaces only: set default password + encryption + rename SSID.
+	# One random per-device password, shared by all factory interfaces (the
+	# MLD's links must use the same PSK anyway). If generation ever comes up
+	# short, bail WITHOUT the applied sentinel - retry next boot rather than
+	# fall back to anything guessable.
+	key=''
+	tries=0
+	while [ "${#key}" -lt 16 ]; do
+		tries=$((tries + 1))
+		[ "$tries" -gt 5 ] && return 0
+		key=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 16)
+	done
+
+	# On factory interfaces only: set random password + encryption + rename SSID.
 	# Factory SSIDs are MT76_AP_MLD and OpenWrt (or OpenWrt-Nxxxx / OpenWrt-2g...).
 	for iface in $(uci show wireless | grep '=wifi-iface' | cut -d'.' -f2 | cut -d'=' -f1); do
 		ssid=$(uci -q get wireless.${iface}.ssid)
 		case "$ssid" in
 			MT76_AP_MLD|OpenWrt|OpenWrt-*)
-				uci set wireless.${iface}.key='12345678'
+				uci set wireless.${iface}.key="$key"
 				radio=$(uci -q get wireless.${iface}.device)
 				[ "$radio" = 'radio2' ] && enc='sae' || enc='sae-mixed'
 				uci set wireless.${iface}.encryption="$enc"
@@ -51,6 +65,8 @@ boot() {
 		esac
 	done
 	uci commit wireless
+	logger -t wifimgr-defaults \
+		'factory wifi secured with a random password - read it in LuCI (Network > Wireless) or: uci show wireless | grep key'
 
 	# Ensure br-lan has a proper /24 netmask (factory default may leave it /32).
 	uci set network.lan.netmask='255.255.255.0'

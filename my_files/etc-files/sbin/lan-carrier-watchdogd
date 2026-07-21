@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# BPI-R4: revive copper ports whose link partner failed to renegotiate.
+#
+# After a (warm) reboot the switch PHYs restart autonegotiation while an
+# already-up partner NIC is still listening from its old link session;
+# some partners (seen live: Realtek RTL8125 / r8169 on a wired PC) end up
+# in a deadlock where BOTH ends report no carrier forever. Waiting never
+# helps and no ethtool renegotiation on the partner-less side helps, but
+# a brief admin down/up of the router port restarts autoneg on both ends
+# and the link comes back within ~3 s. On a genuinely empty port the
+# bounce is a no-op, so bouncing blindly is safe.
+#
+# Loop: every POLL_SEC check each copper port; after STUCK_POLLS polls
+# without carrier, bounce it, then hold off BOUNCE_EVERY polls so a truly
+# empty port is only re-bounced occasionally. First bounce per port and
+# any post-bounce link restoration are logged; the rest is silent.
+#
+# Started by procd via /etc/init.d/lan-carrier-watchdog - kept out of the
+# init script itself so the eternal loop never holds rc.common's per-
+# service flock (which would deadlock any later restart/stop/status).
+
+PORTS="lan1 lan2 lan3 lan4 wan poe-wan"   # copper ports only - never touch sfp-*
+POLL_SEC=15
+STUCK_POLLS=2      # polls without carrier before bouncing (~30 s stuck)
+BOUNCE_EVERY=20    # polls between bounces of the same port (~5 min)
+
+sleep 30	# let the normal boot bring its links up first
+while :; do
+	for p in $PORTS; do
+		[ -e "/sys/class/net/$p" ] || continue
+		k=$(printf %s "$p" | tr -- - _)   # eval-safe key: "-" is illegal in var names (poe-wan)
+		if [ "$(cat /sys/class/net/$p/carrier 2>/dev/null)" = "1" ]; then
+			eval "b=\${bounced_$k:-0}"
+			[ "$b" = "1" ] && logger -t lan-carrier-watchdog "$p: link restored after bounce"
+			eval "miss_$k=0 cool_$k=0 bounced_$k=0"
+			continue
+		fi
+		eval "miss=\$((\${miss_$k:-0} + 1)) cool=\${cool_$k:-0}"
+		if [ "$cool" -gt 0 ]; then
+			cool=$((cool - 1))
+		elif [ "$miss" -ge "$STUCK_POLLS" ]; then
+			ip link set "$p" down
+			sleep 2
+			ip link set "$p" up
+			cool=$BOUNCE_EVERY
+			eval "logged=\${logged_$k:-0}"
+			if [ "$logged" = "0" ]; then
+				logger -t lan-carrier-watchdog "$p: no carrier for $((miss * POLL_SEC))s, bouncing (later bounces not logged)"
+				eval "logged_$k=1"
+			fi
+			eval "bounced_$k=1"
+		fi
+		eval "miss_$k=$miss cool_$k=$cool"
+	done
+	sleep "$POLL_SEC"
+done

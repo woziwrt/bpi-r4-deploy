@@ -21,10 +21,19 @@ _restore() {
     fi
 }
 
+# Bounded wait + full fd detach: sku_disable can legitimately stay 1
+# forever (SKU tables unused on this build), and an eternal child that
+# inherits the hotplug fds wedges procd's whole hotplug queue - every
+# later net uevent (sysctl defaults, smp tuning) then queues behind it
+# until reboot (seen live 2026-07-21, stuck since boot). Give up after
+# 120 s; the kernel-side tx_power patch covers the EEPROM case anyway.
 (
+    n=0
     while [ "$(cat /sys/kernel/debug/ieee80211/phy0/mt76/sku_disable 2>/dev/null)" != "0" ]; do
+        n=$((n + 1))
+        [ "$n" -ge 120 ] && exit 0
         sleep 1
     done
     _restore 0
     _restore 2
-) &
+) < /dev/null > /dev/null 2>&1 &

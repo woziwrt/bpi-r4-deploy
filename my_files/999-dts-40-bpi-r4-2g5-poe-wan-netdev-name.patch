@@ -1,0 +1,19 @@
+BPI-R4 2.5GbE/PoE variant: name the 2.5GbE PoE-in jack "poe-wan"
+
+The 2.5GbE RJ45 (the PoE-powered uplink jack on the PoE board) is gmac1
+and was named "lan4", which suggests a LAN port; the stock board
+defaults even bridge it into br-lan, so an uplink plugged there links up
+but never gets a WAN lease. Name it "poe-wan" to match its role; the
+98-poe-wan-port uci-defaults script puts it in br-wan.
+
+--- a/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4-2g5.dts
++++ b/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4-2g5.dts
+@@ -25,7 +25,7 @@
+ 	phy-mode = "internal";
+ 	phy-connection-type = "internal";
+ 	phy = <&int_2p5g_phy>;
+-	openwrt,netdev-name = "lan4";
++	openwrt,netdev-name = "poe-wan";
+ 	status = "okay";
+ };
+

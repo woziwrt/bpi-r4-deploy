@@ -49,6 +49,9 @@ echo "CONFIG_TASK_IO_ACCOUNTING=y" >> target/linux/mediatek/filogic/config-6.12
 
 \cp -r ../my_files/999-fitblk-02-w-add-bpi-r4-nvme-fitblk.patch target/linux/mediatek/patches-6.12
 
+# 2.5GbE/PoE jack: rename netdev lan4 -> poe-wan (bpi-r4-2g5 dts)
+\cp -r ../my_files/999-dts-40-bpi-r4-2g5-poe-wan-netdev-name.patch target/linux/mediatek/patches-6.12/
+
 \cp -r ../my_files/sms-tool/ feeds/packages/utils/sms-tool
 \cp -r ../my_files/modemdata-main/ feeds/packages/utils/modemdata 
 \cp -r ../my_files/luci-app-modemdata-main/luci-app-modemdata/ feeds/luci/applications
@@ -71,12 +74,16 @@ chmod +x files/etc/uci-defaults/95-mtk-led-fix-enable
 # restarts; a brief down/up revives the link in ~3s)
 \cp ../my_files/etc-files/init.d/lan-carrier-watchdog files/etc/init.d/
 chmod +x files/etc/init.d/lan-carrier-watchdog
+mkdir -p files/usr/sbin
+\cp ../my_files/etc-files/sbin/lan-carrier-watchdogd files/usr/sbin/
+chmod +x files/usr/sbin/lan-carrier-watchdogd
 \cp ../my_files/etc-files/uci-defaults/97-lan-carrier-watchdog-enable files/etc/uci-defaults/
 chmod +x files/etc/uci-defaults/97-lan-carrier-watchdog-enable
 
-# WAN on the 2.5GbE/PoE jack: stock defaults bridge that port ("lan4") into
-# br-lan, so an uplink plugged there links up but never gets a WAN lease;
-# move it to br-wan (bpi-r4-2g5/poe boards only, no-op elsewhere)
+# WAN on the 2.5GbE/PoE jack: stock defaults still bridge it (as "lan4") into
+# br-lan, so an uplink plugged there links up but never gets a WAN lease; drop
+# stale lan4 entries and put the renamed poe-wan port in br-wan
+# (bpi-r4-2g5/poe boards only, no-op elsewhere)
 \cp ../my_files/etc-files/uci-defaults/98-poe-wan-port files/etc/uci-defaults/
 chmod +x files/etc/uci-defaults/98-poe-wan-port
 

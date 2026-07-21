@@ -1,12 +1,15 @@
 #!/bin/sh
 #
 # BPI-R4 2.5GbE variants (bpi-r4-2g5 / bpi-r4-poe): the 2.5GbE RJ45 jack -
-# the PoE-in uplink port on the PoE board - enumerates as "lan4", and the
-# stock OpenWrt defaults bridge it into br-lan. An uplink cable plugged
+# the PoE-in uplink port on the PoE board - is gmac1, renamed to "poe-wan"
+# by our DTS patch (999-dts-40). The stock OpenWrt board defaults still
+# know it as "lan4" and bridge it into br-lan, so an uplink cable plugged
 # there shows link but gets bridged into the LAN: the router never asks
-# for a WAN lease and has no internet (seen live 2026-07-21). Move the
-# port to br-wan so any copper uplink jack (wan, sfp-wan or 2.5G/PoE)
-# works as WAN. Idempotent: also migrates configs preserved by sysupgrade.
+# for a WAN lease and has no internet (seen live 2026-07-21). Drop the
+# stale "lan4" entries and put poe-wan in br-wan so any copper uplink
+# jack (wan, sfp-wan or the 2.5G/PoE jack) works as WAN. Idempotent:
+# also migrates configs preserved by sysupgrade (including ones from
+# firmwares where the port was still called lan4).
 
 . /lib/functions.sh
 
@@ -30,7 +33,8 @@ config_foreach find_bridge device
 [ -n "$lan_sec" ] && [ -n "$wan_sec" ] || exit 0
 
 uci -q del_list "network.$lan_sec.ports=lan4"
-uci -q get "network.$wan_sec.ports" | grep -qw lan4 || \
-	uci add_list "network.$wan_sec.ports=lan4"
+uci -q del_list "network.$wan_sec.ports=lan4"
+uci -q get "network.$wan_sec.ports" | grep -qw poe-wan || \
+	uci add_list "network.$wan_sec.ports=poe-wan"
 uci commit network
 exit 0

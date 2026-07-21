@@ -1,0 +1,6 @@
+#!/bin/sh
+# Enable and start the LAN carrier watchdog (post-reboot autoneg deadlock fix).
+[ -x /etc/init.d/lan-carrier-watchdog ] || exit 0
+/etc/init.d/lan-carrier-watchdog enable
+/etc/init.d/lan-carrier-watchdog start
+exit 0

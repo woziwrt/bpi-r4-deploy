@@ -77,6 +77,14 @@ chmod +x files/etc/init.d/mtk-led-fix
 \cp ../my_files/etc-files/uci-defaults/95-mtk-led-fix-enable files/etc/uci-defaults/
 chmod +x files/etc/uci-defaults/95-mtk-led-fix-enable
 
+# LAN carrier watchdog: bounce copper ports stuck with no carrier after a reboot
+# (some partner NICs, e.g. Realtek RTL8125, deadlock autoneg when the router side
+# restarts; a brief down/up revives the link in ~3s)
+\cp ../my_files/etc-files/init.d/lan-carrier-watchdog files/etc/init.d/
+chmod +x files/etc/init.d/lan-carrier-watchdog
+\cp ../my_files/etc-files/uci-defaults/97-lan-carrier-watchdog-enable files/etc/uci-defaults/
+chmod +x files/etc/uci-defaults/97-lan-carrier-watchdog-enable
+
 # SD auto-expand: grow production + fitrw f2fs to fill the SD card on first boot (SD-only, guarded)
 mkdir -p files/lib/preinit
 \cp ../my_files/etc-files/lib/preinit/19-expand-fit-rootfs files/lib/preinit/

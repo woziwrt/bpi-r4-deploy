@@ -86,6 +86,12 @@ chmod +x files/etc/uci-defaults/97-lan-carrier-watchdog-enable
 # (bpi-r4-2g5/poe boards only, no-op elsewhere)
 \cp ../my_files/etc-files/uci-defaults/98-poe-wan-port files/etc/uci-defaults/
 chmod +x files/etc/uci-defaults/98-poe-wan-port
+# ...and fix the port map at its source: patch the stock board defaults so
+# board.json (config_generate input + LuCI status-page ports strip) carries
+# poe-wan as a wan member instead of LAN "lan4" on bpi-r4-2g5/poe.
+# grep guard: fail the build loudly if upstream reshapes this line.
+grep -q 'ucidef_set_interfaces_lan_wan "lan1 lan2 lan3 lan4" "wan sfp-wan"' target/linux/mediatek/filogic/base-files/etc/board.d/02_network
+sed -i 's/ucidef_set_interfaces_lan_wan "lan1 lan2 lan3 lan4" "wan sfp-wan"/ucidef_set_interfaces_lan_wan "lan1 lan2 lan3" "wan sfp-wan poe-wan"/' target/linux/mediatek/filogic/base-files/etc/board.d/02_network
 
 # SD auto-expand: grow production + fitrw f2fs to fill the SD card on first boot (SD-only, guarded)
 mkdir -p files/lib/preinit

@@ -26,6 +26,7 @@ Complete install system that runs entirely on GitHub — no Linux machine needed
   - [Switching between NAND and NVMe](#switching-between-nand-and-nvme)
 - [Part D — BPI-R4 Pro 8X: UniFi stack](#part-d--bpi-r4-pro-8x-unifi-stack)
 - [Part E — Fork and customize](#part-e--fork-and-customize)
+- [Part F — Build locally with Docker](#part-f--build-locally-with-docker)
 - [Architecture](#architecture)
 - [NVMe partition layout](#nvme-partition-layout)
 - [Hardware notes](#hardware-notes)
@@ -417,6 +418,45 @@ Fork this repository to build your own customized release.
 4. After ~2 hours, releases appear in your fork.
 
 To install from your fork, edit `GH_USER` at the top of the install scripts.
+
+---
+
+## Part F — Build locally with Docker
+
+Build the exact same images the GitHub workflow produces, on your own machine.
+
+**Requirements:** Docker, ~50 GB free disk, a few hours of build time.
+
+```
+./local-build.sh standard      # or: wired | pro | pro-wired
+./local-release.sh standard    # optional: assemble the same rel-* dirs the releases ship
+```
+
+`local-build.sh` mirrors the workflow step for step: the same variant → builder
+mapping, the same pinned versions from `build-versions.env` (override with
+`OPENWRT_COMMIT` / `MTK_COMMIT` environment variables, like the
+workflow_dispatch inputs), and the same dependency set inside an
+`ubuntu-22.04` container ([docker/Dockerfile](docker/Dockerfile)). The build
+runs as your own UID, never as root.
+
+The repo is staged into `local-build/<variant>/` (a fresh-checkout equivalent
+— uncommitted changes are included, so you can test fixes before committing),
+and the builder creates its ~50 GB `openwrt/` tree there, keeping the checkout
+clean. Results:
+
+| What | Where |
+|------|-------|
+| Images | `local-build/<variant>/openwrt/bin/targets/mediatek/filogic/` |
+| Release layout | `local-build/<variant>/release/rel-*` (after `local-release.sh`) |
+| Build log | wherever you redirect stdout; the build is fully non-interactive |
+
+To iterate on image recipes without a full rebuild, edit files under
+`local-build/<variant>/openwrt/` directly and regenerate just the images:
+
+```
+docker run --rm --init -v "$PWD/local-build/standard":/work bpi-r4-deploy-builder \
+  bash -c "cd openwrt && make -j$(nproc) target/install"
+```
 
 ---
 

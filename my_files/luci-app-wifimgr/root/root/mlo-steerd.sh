@@ -1,5 +1,5 @@
 #!/bin/sh
-# mlo-steerd v0.5 - MLO Link Steering Daemon + Neg-TTLM + R-TWT
+# mlo-steerd v0.6 - MLO Link Steering Daemon + Neg-TTLM + R-TWT
 #
 # Steering algorithm (per-link):
 #   Hard disable : SNR < SNR_HARD_LOW (ignore other params)
@@ -10,13 +10,24 @@
 #                  score in between      → no change (hysteresis)
 #   Cooldown     : min COOLDOWN_S seconds between ATTLM actions
 #
+# Measurement validity (v0.6): a reading only counts if the link is ALIVE —
+# per-link `inactive time` <= LINK_INACTIVE_MAX_MS and RSSI above RSSI_FLOOR.
+# An idle link reports a sentinel RSSI (~-105 dBm observed on this FW);
+# v0.5 turned that into "SNR=-9dB → HARD DISABLE" and, since a link it had
+# just re-enabled is idle by definition, re-disabled 6G every expiry block
+# forever. MLO clients joining through the flapping link hit SAE timeouts
+# (deauth reason=39) — Android shows "wrong password". Idle is not a
+# measurement: no data → no steering. A disable additionally needs the bad
+# condition confirmed on BAD_CONFIRM consecutive valid readings.
+#
 # A-TTLM lifecycle (v0.5): hostapd refuses a new set_attlm while one is
 # active ("Busy: A-TTLM is on-going") and offers no early cancel, so a
 # disable is issued ONCE per ATTLM_DURATION block. When the block expires
-# the links come back on their own and the next loop re-measures REAL SNR
-# on the re-enabled link — that expiry IS the re-enable probe. v0.4 instead
-# re-issued the mask every 10 s (rejected → Busy flood) and required valid
-# SNR on a link it had itself emptied of clients (re-enable never fired).
+# the links come back on their own and the next loop re-measures on the
+# re-enabled link — with v0.6 validity gating the probe stays neutral until
+# a client actually uses the link again. v0.4 instead re-issued the mask
+# every 10 s (rejected → Busy flood) and required valid SNR on a link it
+# had itself emptied of clients (re-enable never fired).
 #
 # R-TWT groups (WiFi 7 R2, recommendation=4):
 #   Group 1 (Voice): TID 6+7, ~524ms interval — guaranteed time slot for VoIP
@@ -42,6 +53,11 @@ SCORE_ENABLE=6000
 # Retries confirmation for hard enable (% of the last interval, not lifetime)
 RETRIES_CONFIRM=15
 RETRIES_MIN_PKTS=20    # need at least this many tx in the interval to trust %
+
+# Measurement validity (v0.6)
+RSSI_FLOOR=-92             # at/below this the reading is sentinel/noise, not signal
+LINK_INACTIVE_MAX_MS=30000 # link idle longer than this has no fresh measurement
+BAD_CONFIRM=3              # consecutive valid-and-bad readings required to disable
 
 # Cooldown between ATTLM actions (seconds)
 COOLDOWN_S=30
@@ -119,15 +135,21 @@ tx_totals() {
         END { printf "%d %d", total+0, retries+0 }'
 }
 
-# Get minimum RSSI for a link_id (returns "none" if link idle)
+# Get minimum RSSI for a link_id across stations actively using that link.
+# Returns "none" when no station has a live, sane reading on it: per-link
+# `inactive time` must be recent and RSSI above the sentinel floor —
+# an idle link's signal value is a leftover, not a measurement (v0.6).
 min_rssi() {
     local lid="$1"
-    iw dev "$MLO_IF" station dump 2>/dev/null | awk -v lid="$lid" '
-        /Link/ { in_link = (index($0, "Link " lid ":") > 0) }
+    iw dev "$MLO_IF" station dump 2>/dev/null | awk \
+        -v lid="$lid" -v floor="$RSSI_FLOOR" -v max_ia="$LINK_INACTIVE_MAX_MS" '
+        /Link/ { in_link = (index($0, "Link " lid ":") > 0); ia = -1 }
+        in_link && /inactive time:/ { ia = $(NF-1)+0 }
         in_link && /signal:/ && /\[/ {
             v=$0; sub(/.*signal:[[:space:]]*/,"",v); sub(/[[:space:]].*/, "",v)
             val=v+0
-            if (val != 0 && (min==0 || val < min)) min=val
+            if (val != 0 && val > floor && ia >= 0 && ia <= max_ia && \
+                (min==0 || val < min)) min=val
             in_link=0
         }
         END { print (min+0 != 0) ? min : "none" }
@@ -297,7 +319,7 @@ btwt_status() {
 
 # --- main ---
 
-log "Started v0.5: if=$MLO_IF interval=${INTERVAL}s algo=weighted(SNR60+RET30+BUSY10) cooldown=${COOLDOWN_S}s attlm_block=${ATTLM_DUR_S}s rtwt=${RTWT_ENABLED}"
+log "Started v0.6: if=$MLO_IF interval=${INTERVAL}s algo=weighted(SNR60+RET30+BUSY10) validity=(rssi>${RSSI_FLOOR},inact<${LINK_INACTIVE_MAX_MS}ms,confirm=${BAD_CONFIRM}) cooldown=${COOLDOWN_S}s attlm_block=${ATTLM_DUR_S}s rtwt=${RTWT_ENABLED}"
 log "Override: set via 'uci set mlo-steerd.global.mode=auto|all_on|5g_only && uci commit mlo-steerd'"
 
 WANT_DISABLE_6=0
@@ -308,6 +330,8 @@ RTWT_LOOP_CTR=0
 LAST_MASK_SENT=0       # mask of the currently advertised A-TTLM (0 = none)
 ATTLM_SET_AT=0         # epoch when it was issued
 RET=0
+BAD6_STREAK=0          # consecutive valid-and-bad readings (v0.6 confirmation)
+BAD5_STREAK=0
 # Seed the counters so the first interval isn't computed against zero
 # (that would make iteration one see the lifetime ratio again)
 set -- $(tx_totals)
@@ -382,18 +406,30 @@ while true; do
     fi
 
     # --- 6G steering (skipped in override mode) ---
+    # Invalid reading (idle link / sentinel RSSI) breaks a confirmation streak:
+    # only consecutive genuinely-observed bad readings may disable a link.
+    [ "$SNR2_VALID" -eq 0 ] && BAD6_STREAK=0
+    [ "$SNR1_VALID" -eq 0 ] && BAD5_STREAK=0
     if [ "$MODE" = "auto" ] && [ "$SNR2_VALID" -eq 1 ] && [ "$COOLDOWN_OK" -eq 1 ]; then
         if [ "$WANT_DISABLE_6" -eq 0 ]; then
-            # Check for disable
+            # Check for disable (needs BAD_CONFIRM consecutive bad readings)
+            BAD6=0
             if [ "$SNR2" -lt "$SNR_HARD_LOW_6" ]; then
-                WANT_DISABLE_6=1; LAST_ACTION=$NOW
-                log "6G: SNR=${SNR2}dB < hard_low=${SNR_HARD_LOW_6}dB → HARD DISABLE"
+                BAD6=1; REASON6="SNR=${SNR2}dB < hard_low=${SNR_HARD_LOW_6}dB"
             else
                 SCORE=$(link_score "$SNR2" "$RET" "$BUSY2" "$SNR_HARD_LOW_6" "$SNR_HARD_HIGH_6")
                 if [ "$SCORE" -lt "$SCORE_DISABLE" ]; then
-                    WANT_DISABLE_6=1; LAST_ACTION=$NOW
-                    log "6G: SNR=${SNR2}dB ret=${RET}% busy=${BUSY2}% score=$SCORE < $SCORE_DISABLE → DISABLE"
+                    BAD6=1; REASON6="score=$SCORE < $SCORE_DISABLE (SNR=${SNR2}dB ret=${RET}% busy=${BUSY2}%)"
                 fi
+            fi
+            if [ "$BAD6" -eq 1 ]; then
+                BAD6_STREAK=$(( BAD6_STREAK + 1 ))
+                if [ "$BAD6_STREAK" -ge "$BAD_CONFIRM" ]; then
+                    WANT_DISABLE_6=1; LAST_ACTION=$NOW; BAD6_STREAK=0
+                    log "6G: $REASON6 confirmed ${BAD_CONFIRM}x → DISABLE"
+                fi
+            else
+                BAD6_STREAK=0
             fi
         else
             # Check for enable (only reachable while no A-TTLM is advertised,
@@ -414,15 +450,23 @@ while true; do
     # --- 5G steering (only if 6G already disabled, skipped in override mode) ---
     if [ "$MODE" = "auto" ] && [ "$SNR1_VALID" -eq 1 ] && [ "$COOLDOWN_OK" -eq 1 ]; then
         if [ "$WANT_DISABLE_5" -eq 0 ] && [ "$WANT_DISABLE_6" -eq 1 ]; then
+            BAD5=0
             if [ "$SNR1" -lt "$SNR_HARD_LOW_5" ]; then
-                WANT_DISABLE_5=1; LAST_ACTION=$NOW
-                log "5G: SNR=${SNR1}dB < hard_low=${SNR_HARD_LOW_5}dB → HARD DISABLE"
+                BAD5=1; REASON5="SNR=${SNR1}dB < hard_low=${SNR_HARD_LOW_5}dB"
             else
                 SCORE=$(link_score "$SNR1" "$RET" "$BUSY1" "$SNR_HARD_LOW_5" "$SNR_HARD_HIGH_5")
                 if [ "$SCORE" -lt "$SCORE_DISABLE" ]; then
-                    WANT_DISABLE_5=1; LAST_ACTION=$NOW
-                    log "5G: SNR=${SNR1}dB ret=${RET}% busy=${BUSY1}% score=$SCORE < $SCORE_DISABLE → DISABLE"
+                    BAD5=1; REASON5="score=$SCORE < $SCORE_DISABLE (SNR=${SNR1}dB ret=${RET}% busy=${BUSY1}%)"
                 fi
+            fi
+            if [ "$BAD5" -eq 1 ]; then
+                BAD5_STREAK=$(( BAD5_STREAK + 1 ))
+                if [ "$BAD5_STREAK" -ge "$BAD_CONFIRM" ]; then
+                    WANT_DISABLE_5=1; LAST_ACTION=$NOW; BAD5_STREAK=0
+                    log "5G: $REASON5 confirmed ${BAD_CONFIRM}x → DISABLE"
+                fi
+            else
+                BAD5_STREAK=0
             fi
         elif [ "$WANT_DISABLE_5" -eq 1 ]; then
             if [ "$SNR1" -gt "$SNR_HARD_HIGH_5" ] && [ "$RET" -lt "$RETRIES_CONFIRM" ]; then

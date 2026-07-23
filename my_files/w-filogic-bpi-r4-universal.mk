@@ -287,3 +287,20 @@ define Device/bananapi_bpi-r4-nand-8gb
   ARTIFACTS := snand-img.bin
 endef
 TARGET_DEVICES += bananapi_bpi-r4-nand-8gb
+
+# Full PoE system running from NAND (not just an installer). The DTS maps only
+# 128 MiB of the SPI-NAND (BL2 2 MiB + ubi 126 MiB) regardless of the 256 MiB
+# chip, leaving 122 MiB of UBI. A docker-bearing FIT is 106.5 MiB of that and
+# strands rootfs_data at 4 MiB; without docker the FIT is 49 MiB and the
+# overlay comes out at 57 MiB (both measured on a Winbond 256 MiB part).
+define Device/bananapi_bpi-r4-poe-nand-8gb
+  DEVICE_MODEL := BPi-R4 2.5GE 8GB NAND
+  DEVICE_DTS := mt7988a-bananapi-bpi-r4-2g5
+  DEVICE_DTS_CONFIG := config-mt7988a-bananapi-bpi-r4-poe
+  $(call Device/bananapi_bpi-r4-common-8gb,bananapi_bpi-r4-poe)
+  DEVICE_PACKAGES += mt798x-2p5g-phy-firmware-internal kmod-mt798x-2p5g-phy
+  ARTIFACTS := snand-img.bin
+  SUPPORTED_DEVICES += bananapi,bpi-r4-2g5
+  UBINIZE_PARTS := fip=:$(STAGING_DIR_IMAGE)/mt7988_bananapi_bpi-r4-poe-snand-u-boot.fip
+endef
+TARGET_DEVICES += bananapi_bpi-r4-poe-nand-8gb

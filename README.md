@@ -494,6 +494,30 @@ docker run --rm --init -v "$PWD/local-build/standard":/work bpi-r4-deploy-builde
 
 For new builds, **BPI-R4 8 GB RAM rev 1.2+** is recommended.
 
+### BE14 Wi-Fi module — TX power
+
+Some BPI-R4-NIC-BE14 modules ship with **zeroed TX-power calibration** for 2.4/5 GHz in EEPROM (6 GHz is fine). Untreated, those bands transmit at ~6–7 dBm instead of ~27 — weak signal, clients dropping, and SAE re-auth failures that Android reports as *"Incorrect Wi-Fi password."*
+
+These images carry Ivan Mironov's mt76 fix ([openwrt#17489](https://github.com/openwrt/openwrt/issues/17489)) in every builder: at driver init it fills only the zeroed target bytes from MediaTek's reference firmware and leaves healthy modules untouched.
+
+On top of that repair, the WiFi Manager universal image raises the **5 GHz** targets by a configurable amount (default **+4 dB**), exposed as an `mt7996e` module parameter. Retune it on a running router — no rebuild. Edit `/etc/modules.d/mt7996e` and add `tx_power_5g_boost_db=N` (whole dB, `0`–`10`; `0` disables the boost) to the line:
+
+```sh
+# example: back off to +2 dB. The file already contains "mt7996e wed_enable=1"
+echo 'mt7996e wed_enable=1 tx_power_5g_boost_db=2' > /etc/modules.d/mt7996e
+reboot
+# read back after boot (empty override falls back to the built-in default of 4):
+cat /sys/module/mt7996e/parameters/tx_power_5g_boost_db
+```
+
+| Check | Command | Healthy result |
+|-------|---------|----------------|
+| Repair active | `dmesg \| grep "tx_power zeros"` | warning present, shows the applied 5 GHz boost |
+| Configured power | `iw dev phy0.1-ap0 info \| grep txpower` | ~30 dBm on 5 GHz (26 with boost 0) |
+| EEPROM targets | `dd if=/sys/kernel/debug/ieee80211/phy0/mt76/eeprom bs=1 skip=$((0x1300)) count=6 \| hexdump -C` | non-zero (e.g. `29 2f 2f 2f 2f 2d`) |
+
+> The boost only scales the *reported target* — it is not an RF-metered measurement, and pushing it high on an internal-PA module can degrade signal quality rather than help. It also cannot improve the **client → AP** (uplink) direction; a weak uplink points at antennas or the client radio, not AP power. Leave it at the default unless you have a specific reason.
+
 ---
 
 ## Known behaviors

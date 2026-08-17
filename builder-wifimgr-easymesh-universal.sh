@@ -3,6 +3,10 @@ set -euo pipefail
 EASYMESH_SHARED=/home/ipsec/easymesh-shared
 . /home/ipsec/easymesh-shared/common-easymesh.sh
 
+# Z ceho se stavi musi jit vyrobit znovu, a neulozenou praci ve sdilenem
+# feedu by `git reset --hard` nize beze slova zahodil.
+easymesh_require_clean_trees
+
 # BUMP 2026-06-28 (HW overeno na obou routerech; predchozi: 7b8ce1e / 42c9ff = 6.12.93):
 #   OpenWrt:  6dead2869209f4ff9825f3169c129c5ef04f6273  (openwrt-25.12 HEAD)
 #   MTK SDK:  13f39a7448764466f0ab5eb290fdefd9a9d2335b  (github git01 HEAD)
@@ -220,4 +224,8 @@ echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-spim-nand-ubi-comb-4bg=y" >> .con
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic build
 
 
-cp openwrt/bin/targets/mediatek/filogic/openwrt-mediatek-filogic-bananapi_bpi-r4-squashfs-sysupgrade.itb /home/ipsec/latest-sysupgrade.itb 2>/dev/null || true
+cp /home/ipsec/universal-new/openwrt/bin/targets/mediatek/filogic/openwrt-mediatek-filogic-bananapi_bpi-r4-squashfs-sysupgrade.itb /home/ipsec/latest-sysupgrade.itb 2>/dev/null || true
+
+# Tenhle adresar sdili obe varianty a kazdy build zacina `rm -rf openwrt`,
+# takze za chvili tu po tomhle vysledku nezbude nic. Odlozit vystup i recept.
+easymesh_archive_build lab-apk /home/ipsec/universal-new

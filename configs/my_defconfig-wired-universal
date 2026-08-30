@@ -427,7 +427,7 @@ CONFIG_PACKAGE_rsyslog=y
 CONFIG_PACKAGE_runc=y
 CONFIG_PACKAGE_sfdisk=y
 CONFIG_PACKAGE_sgdisk=y
-# CONFIG_PACKAGE_smp_util is not set
+CONFIG_PACKAGE_smp_util=y
 CONFIG_PACKAGE_sms-tool=y
 # CONFIG_PACKAGE_spidev-test is not set
 CONFIG_PACKAGE_sqm-scripts=y
@@ -533,4 +533,5 @@ CONFIG_PACKAGE_luci-app-temp-status=y
 CONFIG_PACKAGE_luci-app-upnp=y
 CONFIG_PACKAGE_luci-app-wol=y
 CONFIG_PACKAGE_tailscale=y
+CONFIG_PACKAGE_luci-app-tailscale-community=y
 CONFIG_PACKAGE_zerotier=y

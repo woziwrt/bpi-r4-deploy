@@ -1,0 +1,50 @@
+From: Petr Wozniak <petr.wozniak@gmail.com>
+Date: Fri, 26 Jun 2026 16:00:00 +0200
+Subject: [PATCH] net: pcs: mtk-lynxi: don't report link up with unresolved
+ speed in link_poll
+
+The link_poll mechanism (commit 7dfffc16b710 "net: pcs: mtk-lynxi: add
+link_poll mechanism") caches the link state produced by
+mtk_pcs_lynxi_update_state(). In the non-autoneg path the speed is decoded
+from the SGMII_SPEED_MASK field of SGMSYS_SGMII_MODE. During a
+10GBASE-R -> 1000BASE-X (XGDM->GDM) transition this field briefly reads a
+reserved value, so the switch leaves state->speed unresolved while
+state->link has already been set from BMSR_LSTATUS.
+
+get_state then reports "Link is Up - Unsupported/Half", phylink brings the
+MAC up with no valid speed configured, and on MediaTek GMAC the Rx FSM
+wedges ("GMAC Rx hang", recoverable only by reboot). Observed on BPI-R4
+Pro 8X with a copper (RTL8261BE) SFP module, reproducible on a warm reboot
+with a 1G link partner.
+
+Don't report the link as up while the speed is not a valid value; keep it
+down so phylink re-polls until the speed resolves. This is confined to the
+link-up cached-state path and does not affect the link-down recovery that
+link_poll provides.
+
+Signed-off-by: Petr Wozniak <petr.wozniak@gmail.com>
+---
+ drivers/net/pcs/pcs-mtk-lynxi.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/net/pcs/pcs-mtk-lynxi.c b/drivers/net/pcs/pcs-mtk-lynxi.c
+--- a/drivers/net/pcs/pcs-mtk-lynxi.c
++++ b/drivers/net/pcs/pcs-mtk-lynxi.c
+@@ -158,6 +158,17 @@ static void mtk_pcs_lynxi_update_state(struct mtk_pcs_lynxi *mpcs)
+ 			state->duplex = DUPLEX_FULL;
+ 	}
+
++	/* Never report link-up with an unresolved/invalid speed: during a
++	 * mode change (e.g. 10GBASE-R -> 1000BASE-X) the SGMII speed field can
++	 * read back a reserved value, surfacing as "Link is Up - Unsupported"
++	 * and wedging the MAC Rx FSM. Hold the link down so phylink re-polls
++	 * until the speed resolves to a valid value.
++	 */
++	if (state->link && state->speed != SPEED_10 &&
++	    state->speed != SPEED_100 && state->speed != SPEED_1000 &&
++	    state->speed != SPEED_2500)
++		state->link = false;
++
+ 	state->interface = mpcs->interface;
+
+ 	mutex_unlock(&mpcs->regmap_lock);

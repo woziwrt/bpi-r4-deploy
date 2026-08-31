@@ -1,0 +1,36 @@
+diff -urN a/hostapd/ctrl_iface.c b/hostapd/ctrl_iface.c
+--- a/hostapd/ctrl_iface.c	2026-08-31 20:30:30.379629515 +0200
++++ b/hostapd/ctrl_iface.c	2026-08-31 20:30:30.380748120 +0200
+@@ -4323,8 +4323,8 @@
+ 			neg_ttlm->def_link_map = !!tmp;
+ 			if (neg_ttlm->def_link_map)
+ 				dir = -1;
+-		} else if (os_strncmp(token, "link_map_size=", 15) == 0) {
+-			tmp = atoi(token + 15);
++		} else if (os_strncmp(token, "link_map_size=", 14) == 0) {
++			tmp = atoi(token + 14);
+ 			if (tmp < 0 || tmp > 2) {
+ 				wpa_printf(MSG_ERROR,
+ 					   "TTLM: Invalid link_map_size value: %d",
+@@ -4346,8 +4346,10 @@
+ 			/* If the link map is not specified for some tids, the
+ 			 * tids should be mapped to all valid links
+ 			 */
+-			os_memset(neg_ttlm->dlink, valid_links, sizeof(neg_ttlm->dlink));
+-			os_memset(neg_ttlm->ulink, valid_links, sizeof(neg_ttlm->ulink));
++			for (i = 0; i < IEEE80211_TTLM_NUM_TIDS; i++) {
++				neg_ttlm->dlink[i] = valid_links;
++				neg_ttlm->ulink[i] = valid_links;
++			}
+ 			for (i = 0; i < num_tids; i++) {
+ 				tid_str = strtok_r(NULL, " ", &cmd);
+ 				map_str = strtok_r(NULL, " ", &cmd);
+@@ -4359,7 +4361,7 @@
+ 				}
+ 
+ 				tid = atoi(tid_str);
+-				if (tid < 0 || tid > IEEE80211_TTLM_NUM_TIDS) {
++				if (tid < 0 || tid >= IEEE80211_TTLM_NUM_TIDS) {
+ 					wpa_printf(MSG_ERROR,
+ 						   "TTLM: Invalid TID: %d", tid);
+ 					return -1;

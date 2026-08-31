@@ -58,6 +58,24 @@ easymesh_apply_wifi_patches() {
 	\cp -r "$P/0268-mld-link-free-keeps-aid.patch" \
 		"$MAC80211/package/network/services/hostapd/patches/0268-mld-link-free-keeps-aid.patch"
 
+	# Three bugs in MTK's Neg-TTLM ctrl_iface parser, found while getting the
+	# TID-to-Link chain to fire on hardware 2026-08-31.
+	#
+	#  - os_strncmp(token, "link_map_size=", 15): the literal is 14 chars, so
+	#    the comparison includes its NUL and never matches a token that has a
+	#    value after the '='. link_map_size was silently ignored and
+	#    atoi(token + 15) read past the end of the string.
+	#  - tid > IEEE80211_TTLM_NUM_TIDS allows tid == 8, one past the end of
+	#    dlink[8]/ulink[8]; that write lands in ulink[0].
+	#  - os_memset() fills bytes, but dlink/ulink are u16[]. valid_links 0x3
+	#    became 0x0303 for every TID the caller did not name explicitly.
+	#
+	# Not fixed here: def_link_map=1 sets dir = -1 and then trips the
+	# direction check. Changing that needs the semantics decided first, and we
+	# only ever send def_link_map=0.
+	\cp -r "$P/0269-ttlm-ctrl-iface-parser-fixes.patch" \
+		"$MAC80211/package/network/services/hostapd/patches/0269-ttlm-ctrl-iface-parser-fixes.patch"
+
 	# per-band WiFi LED (MT7996 single-wiphy MLO) + shared tpt trigger.
 	\cp -r "$P/999-wifi-01-mt7996-per-band-leds.patch" \
 		"$MAC80211/package/kernel/mt76/patches/9999-w-mt7996-per-band-leds.patch"

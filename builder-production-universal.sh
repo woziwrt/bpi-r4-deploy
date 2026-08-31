@@ -298,6 +298,22 @@ CONFIG_PACKAGE_smp_util=y
 # LuCI stranka pro tailscale. Demon (CONFIG_PACKAGE_tailscale) uz zapnuty byl,
 # ale bez teto stranky se neda nastavit z webu.
 CONFIG_PACKAGE_luci-app-tailscale-community=y
+# mt76 vendor CLI - druhy nezavisly pristroj na mereni.
+#
+# Driver uz to UMI: mt7996e.ko nese mt7996_vendor_amnt_fill_rx,
+# _amnt_sta_remove a _vendor_pp_bitmap_update (patche 0053/0054 jsou aktivni).
+# Chybel jen userspace nastroj, ktery to ovlada - proto se ta schopnost
+# nedala pouzit.
+#
+# `amnt` (air monitor) sleduje az 16 stanic a meri jejich signal, i kdyz
+# NEJSOU asociovane - zaznam se odebira teprve pri pripojeni. Tim se da
+# predem zmerit, jak silne uzel slysi kandidaty na rodice, misto abychom
+# backhaul prehazovali naslepo (31. 8.: `.3` se stehovala pres ROAM a doufalo
+# se). Pro ④ je to druhe nezavisle meridlo vedle `iw`, ktere dnes chybelo.
+# Bonus: pp_bitmap_update je meridlo puncturingu.
+#
+# Nic nespousti sam od sebe - je to CLI, zavisle jen na libc a libnl-tiny.
+CONFIG_PACKAGE_mt76-vendor=y
 BAKE_EOF
 
 

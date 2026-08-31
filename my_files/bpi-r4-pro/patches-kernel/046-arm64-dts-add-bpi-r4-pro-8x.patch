@@ -1,6 +1,6 @@
 --- /dev/null	2026-06-03 07:32:46.481863000 +0200
 +++ b/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4-pro-8x.dts	2026-06-03 07:32:37.479298898 +0200
-@@ -0,0 +1,792 @@
+@@ -0,0 +1,802 @@
 +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
 +/*
 + * Copyright (C) 2022 MediaTek Inc.
@@ -284,8 +284,8 @@
 +
 +				ds_channel_1: channel@1 {
 +					reg = <1>;
-+					phy-mode = "10gbase-r";
-+					phy-connection-type = "10gbase-r";
++					phy-mode = "usxgmii";
++					phy-connection-type = "usxgmii";
 +					phy-handle = <&phy24>;
 +				};
 +			};
@@ -667,6 +667,21 @@
 +};
 +
 +&ssusb0 {
++	/* Both USB workarounds here were for CN15 and both are gone.
++	 *
++	 * They carried the comment "HW-verified 2026-06-17" and were believed
++	 * good for two months - but they had never once been built into an
++	 * image. The first build that shipped them, 2026-08-25, took the modem
++	 * in CN18 off the bus entirely: u2p-dis-msk on ssusb1 removes the USB2
++	 * half of the VIA hub, and without it the Telit FN990 never enumerates.
++	 * Same board, same slot, same module, measured either side of the
++	 * change; the DTS was the only difference.
++	 *
++	 * And there is nothing left for them to protect. CN15 was closed the
++	 * same day as a fault of this board: the design is symmetric across all
++	 * three modem slots, so no configuration was ever going to fix it. The
++	 * modem lives in CN18 or CN21.
++	 */
 +	status = "okay";
 +};
 +

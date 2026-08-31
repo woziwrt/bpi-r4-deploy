@@ -26,11 +26,11 @@ Signed-off-by: Bo-Cun Chen <bc-bocun.chen@mediatek.com>
  struct mtk_xdp_stats {
  	u64 rx_xdp_redirect;
 @@ -1381,6 +1382,7 @@ struct mtk_eth {
- 	struct net_device		dummy_dev;
+ 	struct net_device		*dummy_dev;
  	struct net_device		*netdev[MTK_MAX_DEVS];
  	struct mtk_mac			*mac[MTK_MAX_DEVS];
 +	struct mtk_mux			*mux[MTK_MAX_DEVS];
- 	int				irq[3];
+ 	int				irq[MTK_FE_IRQ_NUM];
  	u32				msg_enable;
  	unsigned long			sysclk;
 @@ -1463,6 +1465,23 @@ struct mtk_mac {

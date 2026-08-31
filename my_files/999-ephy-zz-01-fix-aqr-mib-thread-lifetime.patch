@@ -1,0 +1,262 @@
+From: Petr Wozniak <petr.wozniak@gmail.com>
+Subject: [PATCH] net: phy: aquantia: stop the MIB thread when the PHY goes away
+
+The MIB debugfs support added by 999-ephy-aqr113c-04-add-mib-debugfs.patch
+starts a kernel thread in aqr107_probe() that dereferences the phy_device
+once a second:
+
+	static int aqr107_mib_thread(void *data)
+	{
+		struct phy_device *phydev = data;
+
+		for (;;) {
+			if (kthread_should_stop())
+				break;
+			aqr107_mib_read(phydev);
+			set_current_state(TASK_INTERRUPTIBLE);
+			schedule_timeout(HZ);
+		}
+		return 0;
+	}
+
+Nothing ever calls kthread_stop(): the driver has no .remove handler. When
+the PHY is torn down the thread keeps running and touches freed memory on
+its next pass, which panics the machine. Reproduced reliably on a BPI-R4
+(MT7988A, 6.12.103) by unplugging a genuine RollBall SFP+ module
+(Aquantia AQR113C) from a running cage:
+
+  Comm: aqr107_mib_thre
+  Unable to handle kernel paging request at virtual address 000018421200007c
+  Call trace:
+    __mutex_lock.constprop.0+0x110/0x4a0
+    mutex_lock+0x34/0x40
+    phy_read_mmd+0x28/0x60
+    aqr107_mib_read+0x24/0x2a4
+    aqr107_mib_thread+0x28/0x54
+    kthread+0xd8/0xdc
+  Kernel panic - not syncing: Oops: Fatal exception
+
+Removing an RTL8261BE module from the same cage is always clean, because
+that module has no bridge and therefore no PHY and no MIB thread.
+
+The module used is the BPI-SFP-10G-T, sold by Banana Pi as the official SFP+
+accessory for the BPI-R4 and BPI-R4 Pro, so this is the vendor's own
+recommended combination rather than an exotic part. Its EEPROM reports
+vendor "OEM", part "SFP-10G-T", rev 1, sn 2606240025, with an Aquantia
+AQR113C inside. Note that a second module sold under the same "OEM" /
+"SFP-10G-T" strings (rev A, sn 2511140049) carries an RTL8261BE and no
+bridge at all, so the EEPROM identity alone does not tell the two apart.
+
+Add the missing .remove handler and stop the thread there. Two related
+leaks in the same code path are fixed as well:
+
+  - the debugfs file keeps phydev as its private data and outlived the
+    PHY; remember its dentry and remove it,
+  - debugfs_lookup() returns a dentry with an elevated refcount which was
+    never dropped, leaking a reference on every probe.
+
+Applies on top of 999-ephy-aqr113c-04-add-mib-debugfs.patch. Named "zz" so it
+is applied after 999-ephy-cux3410-01-add-cux3410-support.patch, which adds one
+more driver using aqr107_probe(); all 14 of them need the .remove handler.
+
+Signed-off-by: Petr Wozniak <petr.wozniak@gmail.com>
+---
+--- a/drivers/net/phy/aquantia/aquantia.h	2026-08-29 18:58:21.463143508 +0200
++++ b/drivers/net/phy/aquantia/aquantia.h	2026-08-29 18:58:21.481895594 +0200
+@@ -193,6 +193,7 @@
+ 	unsigned long leds_active_high;
+ 	struct aqr107_mib_stat mib;
+ 	struct task_struct *mib_thread;
++	struct dentry *mib_file;
+ };
+ 
+ #if IS_REACHABLE(CONFIG_HWMON)
+@@ -202,6 +203,7 @@
+ #endif
+ 
+ int aqr_mib_probe(struct phy_device *phydev);
++void aqr_mib_remove(struct phy_device *phydev);
+ 
+ int aqr_firmware_load(struct phy_device *phydev);
+ 
+--- a/drivers/net/phy/aquantia/aquantia_mib.c	2026-08-29 18:58:21.465758296 +0200
++++ b/drivers/net/phy/aquantia/aquantia_mib.c	2026-08-29 18:58:21.481937080 +0200
+@@ -135,6 +135,7 @@
+ 	};
+ 
+ 	struct aqr107_priv *priv = phydev->priv;
++	bool created = false;
+ 	struct dentry *root;
+ 	char dirname[5];
+ 
+@@ -145,9 +146,17 @@
+ 		root = debugfs_create_dir("aquantia", NULL);
+ 		if (!root)
+ 			return -ENOMEM;
++		created = true;
+ 	}
+ 
+-	debugfs_create_file(dirname, S_IRUGO, root, phydev, &fops_mib);
++	priv->mib_file = debugfs_create_file(dirname, S_IRUGO, root, phydev,
++					     &fops_mib);
++
++	/* debugfs_lookup() returns a dentry with an elevated refcount. The
++	 * directory is shared between PHYs and outlives us, so drop it again.
++	 */
++	if (!created)
++		dput(root);
+ 
+ 	if (!priv->mib_thread) {
+ 		/* create a thread for recording packet counts */
+@@ -165,3 +174,25 @@
+ 
+ 	return 0;
+ }
++
++void aqr_mib_remove(struct phy_device *phydev)
++{
++	struct aqr107_priv *priv = phydev->priv;
++
++	if (!priv)
++		return;
++
++	/* The MIB thread dereferences phydev once a second. It has to be gone
++	 * before the PHY is torn down, otherwise removing the module - for
++	 * example unplugging an SFP module from its cage - leaves the thread
++	 * reading freed memory, which panics the machine.
++	 */
++	if (priv->mib_thread) {
++		kthread_stop(priv->mib_thread);
++		priv->mib_thread = NULL;
++	}
++
++	/* The debugfs file keeps phydev as its private data; drop it too. */
++	debugfs_remove(priv->mib_file);
++	priv->mib_file = NULL;
++}
+--- a/drivers/net/phy/aquantia/aquantia_main.c	2026-08-29 18:58:21.467916672 +0200
++++ b/drivers/net/phy/aquantia/aquantia_main.c	2026-08-29 18:58:21.482109918 +0200
+@@ -950,6 +950,11 @@
+ 	return err;
+ }
+ 
++static void aqr107_remove(struct phy_device *phydev)
++{
++	aqr_mib_remove(phydev);
++}
++
+ static int aqr107_probe(struct phy_device *phydev)
+ {
+ 	int ret;
+@@ -1012,6 +1017,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR107),
+ 	.name		= "Aquantia AQR107",
+ 	.probe		= aqr107_probe,
++	.remove		= aqr107_remove,
+ 	.get_rate_matching = aqr107_get_rate_matching,
+ 	.config_init	= aqr107_config_init,
+ 	.config_aneg    = aqr_config_aneg,
+@@ -1036,6 +1042,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQCS109),
+ 	.name		= "Aquantia AQCS109",
+ 	.probe		= aqr107_probe,
++	.remove		= aqr107_remove,
+ 	.get_rate_matching = aqr107_get_rate_matching,
+ 	.config_init	= aqcs109_config_init,
+ 	.config_aneg    = aqr_config_aneg,
+@@ -1061,6 +1068,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR111),
+ 	.name		= "Aquantia AQR111",
+ 	.probe		= aqr107_probe,
++	.remove		= aqr107_remove,
+ 	.get_rate_matching = aqr107_get_rate_matching,
+ 	.config_init	= aqr107_config_init,
+ 	.config_aneg    = aqr_config_aneg,
+@@ -1086,6 +1094,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR111B0),
+ 	.name		= "Aquantia AQR111B0",
+ 	.probe		= aqr107_probe,
++	.remove		= aqr107_remove,
+ 	.get_rate_matching = aqr107_get_rate_matching,
+ 	.config_init	= aqr107_config_init,
+ 	.config_aneg    = aqr_config_aneg,
+@@ -1119,6 +1128,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR112),
+ 	.name		= "Aquantia AQR112",
+ 	.probe		= aqr107_probe,
++	.remove		= aqr107_remove,
+ 	.config_aneg    = aqr_config_aneg_set_prot,
+ 	.config_intr	= aqr_config_intr,
+ 	.handle_interrupt = aqr_handle_interrupt,
+@@ -1142,6 +1152,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR412),
+ 	.name		= "Aquantia AQR412",
+ 	.probe		= aqr107_probe,
++	.remove		= aqr107_remove,
+ 	.config_aneg    = aqr_config_aneg_set_prot,
+ 	.config_intr	= aqr_config_intr,
+ 	.handle_interrupt = aqr_handle_interrupt,
+@@ -1160,6 +1171,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR113),
+ 	.name		= "Aquantia AQR113",
+ 	.probe          = aqr107_probe,
++	.remove         = aqr107_remove,
+ 	.get_rate_matching = aqr107_get_rate_matching,
+ 	.config_init    = aqr113c_config_init,
+ 	.config_aneg    = aqr_config_aneg,
+@@ -1184,6 +1196,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR113C),
+ 	.name           = "Aquantia AQR113C",
+ 	.probe          = aqr107_probe,
++	.remove         = aqr107_remove,
+ 	.get_rate_matching = aqr107_get_rate_matching,
+ 	.config_init    = aqr113c_config_init,
+ 	.config_aneg    = aqr_config_aneg,
+@@ -1208,6 +1221,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR114C),
+ 	.name           = "Aquantia AQR114C",
+ 	.probe          = aqr107_probe,
++	.remove         = aqr107_remove,
+ 	.get_rate_matching = aqr107_get_rate_matching,
+ 	.config_init    = aqr107_config_init,
+ 	.config_aneg    = aqr_config_aneg,
+@@ -1233,6 +1247,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR115C),
+ 	.name           = "Aquantia AQR115C",
+ 	.probe          = aqr107_probe,
++	.remove         = aqr107_remove,
+ 	.get_rate_matching = aqr107_get_rate_matching,
+ 	.config_init    = aqr113c_config_init,
+ 	.config_aneg    = aqr_config_aneg,
+@@ -1258,6 +1273,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR813),
+ 	.name		= "Aquantia AQR813",
+ 	.probe		= aqr107_probe,
++	.remove		= aqr107_remove,
+ 	.get_rate_matching = aqr107_get_rate_matching,
+ 	.config_init	= aqr107_config_init,
+ 	.config_aneg    = aqr_config_aneg,
+@@ -1282,6 +1298,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR112C),
+ 	.name		= "Aquantia AQR112C",
+ 	.probe		= aqr107_probe,
++	.remove		= aqr107_remove,
+ 	.config_aneg	= aqr_config_aneg_set_prot,
+ 	.config_intr	= aqr_config_intr,
+ 	.handle_interrupt = aqr_handle_interrupt,
+@@ -1294,6 +1311,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_AQR112R),
+ 	.name		= "Aquantia AQR112R",
+ 	.probe		= aqr107_probe,
++	.remove		= aqr107_remove,
+ 	.config_aneg	= aqr_config_aneg_set_prot,
+ 	.config_intr	= aqr_config_intr,
+ 	.handle_interrupt = aqr_handle_interrupt,
+@@ -1306,6 +1324,7 @@
+ 	PHY_ID_MATCH_MODEL(PHY_ID_CUX3410),
+ 	.name		= "Aquantia CUX3410",
+ 	.probe		= aqr107_probe,
++	.remove		= aqr107_remove,
+ 	.get_rate_matching = aqr107_get_rate_matching,
+ 	.config_init	= aqr113c_config_init,
+ 	.config_aneg	= aqr_config_aneg,

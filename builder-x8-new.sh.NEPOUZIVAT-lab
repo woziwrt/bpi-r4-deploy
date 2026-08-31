@@ -104,6 +104,10 @@ mkdir -p files/etc/uci-defaults
 # compat_version fix: pro-8x chybí v board.d/05_compat-version → device by trčel
 # na 1.0 vs image 1.1 → keep-config navždy odmítnut. Zapíšeme 1.1 jako klasici.
 \cp -r ../my_files/06-x8-compat-version files/etc/uci-defaults/; chmod +x files/etc/uci-defaults/06-x8-compat-version
+# netmode/multiap_mode ven z U-Boot prostredi. Zije v NAND, takze prezije
+# firstboot i kazdou reinstalaci eMMC - vyhodit ho z builderu spravi jen desky,
+# ktere ho nikdy nemely. Viz X8-VADY-A-JAK-JE-OPRAVIT.md, vada 1.
+\cp -r ../my_files/07-x8-clear-netmode files/etc/uci-defaults/; chmod +x files/etc/uci-defaults/07-x8-clear-netmode
 # identita se NEpeče (žádný 999-x8-identity). Nasazuje se per-uzel přes
 # node-config.sh po flashi — stejně jako klasici → jeden image → N x8 bez kolize.
 # node-config.sh je board-aware (Pro-8X mgmt=mxl_lan0, AL-MAC z HW). x8 tím padá

@@ -1,0 +1,23 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Scheduled Reboot"
+msgstr "Reinicio programado"
+
+msgid "Scheduled reboot Setting"
+msgstr "Configuración de reinicio programado"
+
+msgid "Week Day"
+msgstr "Día de la semana"
+
+msgid "Everyday"
+msgstr "Todos los días"
+
+msgid "Day"
+msgstr "Día"
+
+msgid "Hour"
+msgstr "Hora"
+
+msgid "Minute"
+msgstr "Minuto"

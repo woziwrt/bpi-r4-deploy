@@ -1,0 +1,50 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: DeciBelioS\n"
+"Language-Team: \n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 3.5.1\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+
+msgid "(%d minute window, %d second interval)"
+msgstr "(ventana de %d minutos, intervalo de %d segundos)"
+
+msgid "Average:"
+msgstr "Promedio:"
+
+msgid "Critical:"
+msgstr "Crítico:"
+
+msgid "Hide"
+msgstr "Ocultar"
+
+msgid "Hot:"
+msgstr "Hot:"
+
+msgid "Minimum:"
+msgstr "Mínimo:"
+
+msgid "No temperature sensors available"
+msgstr "No hay sensores de temperatura disponibles"
+
+msgid "Peak:"
+msgstr "Máximo:"
+
+msgid "Sensor"
+msgstr "Sensor"
+
+msgid "Show hidden sensors"
+msgstr "Mostrar sensores ocultos"
+
+msgid "Temperature"
+msgstr "Temperatura"
+
+msgid "This page displays the temperature sensors data."
+msgstr "Esta página muestra los datos de los sensores de temperatura."

@@ -1,0 +1,39 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+msgid "(%d minute window, %d second interval)"
+msgstr ""
+
+msgid "Average:"
+msgstr ""
+
+msgid "Hide"
+msgstr ""
+
+msgid "Hot:"
+msgstr ""
+
+msgid "Minimum:"
+msgstr ""
+
+msgid "No temperature sensors available"
+msgstr ""
+
+msgid "Overheat:"
+msgstr ""
+
+msgid "Peak:"
+msgstr ""
+
+msgid "Sensor"
+msgstr ""
+
+msgid "Show hidden sensors"
+msgstr ""
+
+msgid "Temperature"
+msgstr ""
+
+msgid "This page displays the temperature sensors data."
+msgstr ""
+

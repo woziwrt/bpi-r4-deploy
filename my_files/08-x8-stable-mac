@@ -1,0 +1,67 @@
+#!/bin/sh
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (C) 2026 Petr Wozniak (WOZIWRT project)
+#
+# Give the Pro 8X a MAC address that is the same after every boot.
+#
+# It does not have one. Measured 2026-08-16 over four boots:
+#
+#   16:0b:a2:9c:e8:34 -> 42:c3:9b:1e:9f:16 -> 3e:d6:67:ce:9a:f7 -> a6:18:08:60:aa:94
+#
+# The ethernet MAC is generated at random each start, and all five mxl_lan*
+# ports share it. Two things follow, and the second is the one that matters
+# for a controller:
+#
+#   br-lan then reaches for the WiFi MAC instead - 00:0c:43:26:60:10, which is
+#   the generic factory address of the MT7996 chip and therefore IDENTICAL on
+#   every board we own. Measured the same day: the controller took frames from
+#   such a node as its own and dropped them, tcpdump saw zero packets, and
+#   overwriting br-lan's MAC fixed it on the first try.
+#
+#   ieee1905 derives the AL-MAC from the board address, so every restart
+#   introduces a NEW node to the mesh. The old one stays behind as a ghost.
+#   And a controller is also the DHCP server: an identity that changes under
+#   it makes every static reservation meaningless and every neighbour's ARP
+#   entry stale.
+#
+# Why not the U-Boot environment, which is where the classic boards keep
+# theirs (fw_printenv ethaddr, and br-lan picks it up): on Pro 8X that
+# variable is a dummy 02:00:11:22:33:44, and fw_setenv writes into the NAND
+# environment while U-Boot boots from eMMC and reads a different one. Writing
+# there would look like it worked and change nothing.
+#
+# So the address is derived instead, from the one number on this board that
+# does not move: the CID of the boot card. Same card, same address, every
+# boot - and if the card is moved to another board the identity moves with it,
+# which is what "flash is the identity" already means everywhere else here.
+#
+# uci-defaults on purpose. The overlay workaround in X8-VADY is erased by a
+# firstboot, which is exactly when a box most needs to come back the same. A
+# uci-default runs again after every one of them.
+
+[ "$(cat /tmp/sysinfo/board_name 2>/dev/null)" = "bananapi,bpi-r4-pro-8x" ] || exit 0
+
+# Already ours? Leave it alone - including a value someone set by hand.
+[ -n "$(uci -q get network.@device[0].macaddr)" ] && exit 0
+
+src=""
+for f in /sys/block/mmcblk0/device/cid /sys/block/mmcblk0/device/serial; do
+	[ -r "$f" ] && { src=$(tr -d ' \0\n' < "$f"); [ -n "$src" ] && break; }
+done
+[ -n "$src" ] || {
+	logger -t x8-mac "no card id to derive an address from - leaving the random one"
+	exit 1
+}
+
+# Locally administered, unicast: second nibble 2. Nothing here may collide
+# with a real vendor prefix, and the same input must always give the same
+# answer - so a plain hash, not anything with time or randomness in it.
+h=$(printf '%s' "$src" | md5sum | cut -c1-12)
+mac=$(printf '%s:%s:%s:%s:%s:%s' \
+	"$(printf '%02x' $(( (0x${h:0:2} & 0xfe) | 0x02 )))" \
+	"${h:2:2}" "${h:4:2}" "${h:6:2}" "${h:8:2}" "${h:10:2}")
+
+uci set network.@device[0].macaddr="$mac"
+uci commit network
+logger -t x8-mac "board address set to $mac (derived from the boot card, stable across reboots)"
+exit 0

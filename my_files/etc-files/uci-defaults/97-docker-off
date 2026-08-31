@@ -1,0 +1,24 @@
+#!/bin/sh
+# Docker stays in the image, but does not start by itself.
+#
+# A mesh node is not a container host by default. Measured 2026-08-17 on a
+# fresh production node: dockerd and its containerd child were running one
+# minute after boot, on a box where nobody had asked for either - and the
+# image ships no interface for them (luci-app-dockerman is not installed), so
+# there is not even a way to reach them from LuCI. That is start-up time,
+# address space and a listening socket for nothing.
+#
+# The packages stay. Removing them would mean a rebuild for whoever does want
+# containers; switching them on is two commands:
+#
+#     /etc/init.d/dockerd enable && /etc/init.d/dockerd start
+#
+# containerd needs no handling of its own: it has no init script and dockerd
+# starts it as a child (checked on hardware the same day).
+
+[ -x /etc/init.d/dockerd ] || exit 0
+
+/etc/init.d/dockerd disable 2>/dev/null
+/etc/init.d/dockerd stop 2>/dev/null
+
+exit 0

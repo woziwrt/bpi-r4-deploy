@@ -1,0 +1,58 @@
+#!/bin/sh
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (C) 2026 Petr Wozniak (WOZIWRT project)
+#
+# Take netmode back out of the U-Boot environment.
+#
+# `netmode=extender` was the July 2026 workaround that made the backhaul form
+# at all: iopsys map_genconfig only emits a `config bsta` under that branch, so
+# without it agent.c never set has_bsta and the bSTA subsystem was a no-op.
+# It worked, and it was right at the time.
+#
+# It is now the opposite. The same branch that produced the bSTA also DELETES
+# every wireless.* with mode=ap (map_genconfig:514-516), and the boards that
+# matter got a better path in the meantime - the MLD backhaul through our own
+# mesh layer, where mlo-backhaul-setup adds the missing declarations without
+# touching /etc/config/wireless at all. So x8 was left running the solution
+# that everywhere else had been replaced, and running it BESIDE its
+# replacement: two config generators over one node, two sets of wireless MLD
+# sections on the same ifnames, and a node that flaps.
+#
+# Measured 2026-08-16, two runs from firstboot differing only in this variable:
+#
+#            with netmode=extender     without
+#   wifi-iface sections   10           4        <- like 4g/8g
+#   legacy wlan*_ap        6           0
+#   radios          did not come up    came up
+#   wizard          "mesh not reachable"   passed
+#
+# Why this has to be a script and not just a builder change: netmode is a
+# U-Boot variable living in NAND (fw_env.config points there even on an eMMC
+# boot). It survives firstboot, and it survives any number of eMMC
+# reinstallations - a board that has it keeps it no matter how clean the image
+# is. Taking it out of the builder only helps boards that never had it.
+#
+# Nothing here writes a value. It removes two, and only if they are there.
+
+command -v fw_printenv >/dev/null 2>&1 || exit 0
+
+changed=0
+for v in netmode multiap_mode; do
+	cur=$(fw_printenv -n "$v" 2>/dev/null) || continue
+	[ -n "$cur" ] || continue
+	logger -t x8-netmode "clearing U-Boot $v (was '$cur') - superseded by the MLD backhaul path"
+	fw_setenv "$v" 2>/dev/null && changed=1
+done
+
+[ "$changed" = 1 ] || exit 0
+
+# Say it worked, or keep the file for another try. A uci-default that exits 0
+# is deleted, and a half-done job that deletes itself is the worst outcome:
+# the box would look configured and behave like the old one.
+for v in netmode multiap_mode; do
+	[ -z "$(fw_printenv -n "$v" 2>/dev/null)" ] || {
+		logger -t x8-netmode "$v is still set - will try again at next boot"
+		exit 1
+	}
+done
+exit 0

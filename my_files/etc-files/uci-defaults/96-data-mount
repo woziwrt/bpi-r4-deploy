@@ -1,0 +1,19 @@
+#!/bin/sh
+# 96-data-mount: mount the NVMe data partition (LABEL=data) at /data.
+#
+# Runtime-gated, NVMe-only: the 'data' partition is created ONLY by
+# install-nvme.sh, so blkid -L data resolves only on an NVMe install. The
+# rootfs squashfs is shared across all media (one build -> SD/eMMC/NVMe/NAND),
+# so this must gate at runtime -> on SD/eMMC/NAND it is a silent no-op.
+blkid -L data >/dev/null 2>&1 || exit 0
+
+if ! uci -q show fstab | grep -q "\.label='data'"; then
+	idx=$(uci add fstab mount)
+	uci set fstab."$idx".target='/data'
+	uci set fstab."$idx".label='data'
+	uci set fstab."$idx".enabled='1'
+	uci set fstab."$idx".options='rw,noatime'
+	uci commit fstab
+fi
+mkdir -p /data
+exit 0

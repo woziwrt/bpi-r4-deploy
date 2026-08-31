@@ -216,41 +216,33 @@ case "$ROLE" in
     uci set mapagent.@controller_select[0].autostart='0'
     uci commit mapcontroller
 
-    # --- L0 wireless backhaul STA (bSTA): declarative + pre-seeded ---
-    # Root cause of "backhaul never forms" (2026-07-15): iopsys map_genconfig only
-    # emits a `config bsta` (+ wifi-iface mode=sta) when U-Boot netmode==extender,
-    # which is unset by default → agent.c never sets has_bsta → the whole bSTA
-    # subsystem is a no-op (no netdev, no scan, no assoc). We set the role env AND
-    # define the bSTA explicitly (mt76 sta ifname = wlan<devidx>_0), pre-seeded
-    # with the lab MAP--BH creds + onboarded=1, so a clean boot deterministically
-    # forms the L0 backhaul with no WPS/DPP button. This replaces the old
-    # keep-config mystery state with reproducible config.
-    # HW-proven 2026-07-15 (5 GHz, EHT160): wlan1_0 → controller wlan1-1 MAP--BH.
-    fw_setenv netmode extender 2>/dev/null || true
-    fw_setenv multiap_mode agent 2>/dev/null || true
-    # 5 GHz primary (band 5, radio1). 2.4 GHz / MLD multi-band added once 5G is N/N.
-    uci add mapagent bsta
-    uci set mapagent.@bsta[-1].device='radio1'
-    uci set mapagent.@bsta[-1].ifname='wlan1_0'
-    uci set mapagent.@bsta[-1].band='5'
-    uci set mapagent.@bsta[-1].priority='1'
-    uci set mapagent.@bsta[-1].ssid="$LAB_BH_SSID"
-    uci set mapagent.@bsta[-1].key="$LAB_BH_KEY"
-    uci set mapagent.@bsta[-1].encryption="$LAB_BH_ENC"
-    uci set mapagent.@bsta[-1].onboarded='1'
-    uci commit mapagent
-    uci set wireless.default_sta_radio1='wifi-iface'
-    uci set wireless.default_sta_radio1.device='radio1'
-    uci set wireless.default_sta_radio1.mode='sta'
-    uci set wireless.default_sta_radio1.ifname='wlan1_0'
-    uci set wireless.default_sta_radio1.disabled='0'
-    uci set wireless.default_sta_radio1.multi_ap='1'
-    uci set wireless.default_sta_radio1.multi_ap_profile='3'
-    uci set wireless.default_sta_radio1.ssid="$LAB_BH_SSID"
-    uci set wireless.default_sta_radio1.encryption="$LAB_BH_ENC"
-    uci set wireless.default_sta_radio1.key="$LAB_BH_KEY"
-    uci commit wireless
-    echo "agent '$HOSTNAME' ($BOARD): mgmt $MGMT_IP ($MGMT_PORT) / mesh $MESH_IP (br-lan) + 5G bSTA. Rebooting..."
+    # --- L0 wireless backhaul STA: REMOVED 2026-08-23 ---
+    #
+    # What stood here was the July 2026 workaround: `fw_setenv netmode extender`
+    # plus a hand-written `mapagent bsta` and a matching wifi-iface, pre-seeded
+    # with the lab MAP--BH credentials. It was right then - iopsys map_genconfig
+    # emits a bSTA only under the netmode branch, so without it agent.c never
+    # set has_bsta and the backhaul never formed (HW-proven 2026-07-15).
+    #
+    # It is wrong now, for three reasons:
+    #
+    # 1. The same branch that produced the bSTA also deletes every wireless.*
+    #    with mode=ap (map_genconfig:514-516). Measured 2026-08-16: with the
+    #    variable set the radios did not come up at all - 10 wifi-iface
+    #    sections instead of 4, three of them with an empty SSID, and netifd
+    #    tearing down every phy on the reference error that follows.
+    # 2. The boards that matter got a better path meanwhile - the MLD backhaul
+    #    through our own mesh layer. mlo-backhaul-setup (easymesh-wifi) adds
+    #    exactly the declarations map_genconfig would not, and says so:
+    #    "Nothing here touches /etc/config/wireless". Running both leaves two
+    #    generators over one node and two sets of sections on one ifname.
+    # 3. It baked LAB credentials into a production image. Harmless only for
+    #    as long as nobody runs this script from an old note.
+    #
+    # The U-Boot variable itself is not removed by deleting this: it lives in
+    # NAND and survives firstboot and every eMMC reinstall. That is what the
+    # uci-default 07-x8-clear-netmode is for.
+    echo "agent '$HOSTNAME' ($BOARD): mgmt $MGMT_IP ($MGMT_PORT) / mesh $MESH_IP (br-lan). Rebooting..."
     ;;
   *)
     echo "role must be 'controller' or 'agent'"; exit 1 ;;

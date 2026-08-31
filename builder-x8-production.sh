@@ -421,6 +421,19 @@ CONFIG_PACKAGE_luci-app-easymesh=y
 CONFIG_PACKAGE_kmod-mdio-netlink=y
 CONFIG_PACKAGE_mdio-tools=y
 CONFIG_PACKAGE_luci-app-wifimgr=y
+# mt76 vendor CLI - druhy nezavisly pristroj na mereni.
+#
+# Driver uz to UMI: mt7996e.ko nese mt7996_vendor_amnt_fill_rx,
+# _amnt_sta_remove a _vendor_pp_bitmap_update (patche 0053/0054 jsou aktivni).
+# Chybel jen userspace nastroj, ktery to ovlada.
+#
+# `amnt` (air monitor) sleduje az 16 stanic a meri jejich signal, i kdyz
+# NEJSOU asociovane - zaznam se odebira teprve pri pripojeni. Tim se da
+# predem zmerit, jak silne uzel slysi kandidaty na rodice, misto abychom
+# backhaul prehazovali naslepo. Pro ④ je to druhe nezavisle meridlo vedle `iw`.
+#
+# Nic nespousti sam od sebe - CLI, zavisle jen na libc a libnl-tiny.
+CONFIG_PACKAGE_mt76-vendor=y
 BAKE_EOF
 
 # PRIDANO 23. 8.: zavislosti se musi dopocitat i pro to, co pribylo AZ TEDY.

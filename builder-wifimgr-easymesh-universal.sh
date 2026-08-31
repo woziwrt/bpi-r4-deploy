@@ -214,6 +214,31 @@ for _s in libeasy libwifi libwifiutils libieee1905 ieee1905 \
 done
 echo ">>> kontrola: mesh vrstva je =m, do obrazu se nezapece"
 
+
+# --- Ladeni SMP/RPS a LuCI pro tailscale (doplneno 2026-08-30) ---
+#
+# smp_util: MTK balicek, ktery po startu rozdeli ethernetova preruseni mezi
+# jadra. Bez nej sedi VSECHNA na cpu0 a krabice da na 10G lince ~5,4 misto
+# ~9,4 Gbit/s (zmereno iperf3 mezi dvema BPI-R4 pres SFP, 30. 8. 2026).
+# Vypadl 21. 8. z commitu "bring the package set in line" a nikdo si toho
+# nevsiml, protoze se to projevi jen pri mereni pres 5 Gbit/s.
+#
+# luci-app-tailscale-community: samotny démon uz zapnuty byl, ale bez teto
+# stranky se tailscale neda nastavit z webu.
+echo "CONFIG_PACKAGE_smp_util=y" >> .config
+echo "CONFIG_PACKAGE_luci-app-tailscale-community=y" >> .config
+
+# Kontrola, ze to prezilo `make defconfig` - stejny princip jako u mesh vrstvy.
+for _s in smp_util luci-app-tailscale-community; do
+	_v=$(grep -E "^(# )?CONFIG_PACKAGE_${_s}[= ]" .config | tail -1)
+	case "$_v" in
+		*"=y") ;;
+		*) echo "CHYBA: CONFIG_PACKAGE_${_s} neni =y (je: ${_v:-CHYBI})" >&2
+		   exit 1 ;;
+	esac
+done
+echo ">>> kontrola: smp_util a luci-app-tailscale-community jsou =y"
+
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-emmc-comb-4bg=y" >> .config
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-sdmmc-comb-4bg=y" >> .config
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-spim-nand-ubi-comb-4bg=y" >> .config

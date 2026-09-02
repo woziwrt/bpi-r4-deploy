@@ -46,7 +46,28 @@ rm -rf mtk-openwrt-feeds
 # ma tytez commity (overeno tehoz dne: obe strany hlasily 4a5c6b90 jako hlavu
 # openwrt-25.12) a jede i ve chvili, kdy .org nejede. MTK feed nize se odtud
 # klonuje uz davno a nikdy to nezlobilo.
-git clone --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt
+# Borrow objects from the local mirror instead of pulling them over the wire.
+#
+# Measured 2026-09-02: a fresh clone of openwrt ran at 737 kB/s while plain
+# curl from the same box managed 6.3 MB/s, so the wait is git and the server,
+# not the link. The repositories are the same on every build, so keeping them
+# on disk removes the wait entirely.
+#
+# --reference-if-able and not --reference on purpose: if a mirror is missing
+# the clone still works, it just downloads everything as it used to.
+#
+# The mirror is deliberately NOT refreshed first. --reference-if-able still
+# contacts the server and pulls whatever the mirror lacks, so a refresh buys
+# nothing and only adds a network wait before every build. Measured 2026-09-02:
+# "git remote update" on the openwrt mirror ran for over a minute on its own.
+#
+# Mirrors are created once:
+#   git clone --mirror https://github.com/openwrt/openwrt.git  ~/mirrors/openwrt.git
+#   git clone --mirror https://github.com/mediatek/mtk-openwrt-feeds ~/mirrors/mtk-feeds.git
+#
+# NOTE: the clone keeps a pointer into the mirror (.git/objects/info/alternates),
+# so do not delete ~/mirrors while a build tree still refers to it.
+git clone --reference-if-able "$HOME/mirrors/openwrt.git" --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt
 cd openwrt; git checkout ${OPENWRT_COMMIT}; cd -;
 
 # A totez pro feedy uvnitr stromu. Prvni z dnesnich dvou padu nebyl na openwrt.git,
@@ -58,8 +79,16 @@ sed -i -e "s|https://git.openwrt.org/feed/|https://github.com/openwrt/|g" \
 
 # BUMP TEST 2026-06-23: tarball nahrazen cerstvym clone z MTK GitHub (vetev main = nase linie)
 #tar xzf /home/ipsec/mtk-feeds-cache.tar.gz
-git clone --branch main https://github.com/mediatek/mtk-openwrt-feeds mtk-openwrt-feeds
+git clone --reference-if-able "$HOME/mirrors/mtk-feeds.git" --branch main https://github.com/mediatek/mtk-openwrt-feeds mtk-openwrt-feeds
 ( cd mtk-openwrt-feeds && git checkout 4e825214deaafc5cdc5457d66a1a828449f07e69 )
+
+# mt76-vendor: air-monitor MAC as six bytes, not as a nest of six u8.
+# Without it `mt76-vendor <dev> set amnt <idx> <mac>` always answers
+# "nl80211 call failed: Invalid argument" - amnt_set_policy declares the
+# attribute NLA_POLICY_EXACT_LEN_WARN(ETH_ALEN) and the tool sends ~48 bytes.
+# amnt is our second, independent instrument for beacon loss, and FIXED_MCS
+# needs it to tell a rate problem from a radio one.
+patch -p1 -d mtk-openwrt-feeds < my_files/999-vendor-01-amnt-macaddr-flat.patch
 
 
 \cp -r my_files/999-sfp-10-additional-quirks.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
@@ -79,6 +108,12 @@ git clone --branch main https://github.com/mediatek/mtk-openwrt-feeds mtk-openwr
 \cp -r my_files/999-wifi-01-mt7996-per-band-leds.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches/9999-w-mt7996-per-band-leds.patch
 \cp -r my_files/999-wifi-02-mt76-share-tpt-led-trigger.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches/9999-w-mt76-share-tpt-led-trigger.patch
 
+
+### mt76-vendor: MTK feed ships cmake_minimum_required(VERSION 2.8); host CMake 4.x
+### removed compatibility with < 3.5 and aborts at configure. Same fix OpenWrt itself
+### uses for libjson-c (patches/002-cmake-version.patch). Build failed 2026-08-31.
+sed -i "s/^cmake_minimum_required(VERSION 2\.8)/cmake_minimum_required(VERSION 3.5)/" \
+	mtk-openwrt-feeds/feed/app/mt76-vendor/src/CMakeLists.txt
 easymesh_apply_wifi_patches
 cd openwrt
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic prepare
@@ -434,6 +469,25 @@ CONFIG_PACKAGE_luci-app-wifimgr=y
 #
 # Nic nespousti sam od sebe - CLI, zavisle jen na libc a libnl-tiny.
 CONFIG_PACKAGE_mt76-vendor=y
+
+# --- EIP look-aside crypto (1. 9. 2026) ---
+#
+# HW akcelerace IPsec. Look-aside, NE inline: inline chce 9 balicku + firmware
+# a namerene dava HORSI propustnost (1,21 vs 1,9 Gb/s). MTK ho z vychozich
+# defconfigu vyhodil, proto se musi dopsat rucne.
+#
+# POZOR: NESTACI jen kmod-crypto-hw-safexcel. Firmware se musi vybrat
+# VYSLOVNE. `+eip197-mini-firmware` v Depends znamena, ze ho apk pri
+# INSTALACI vyzaduje, ale `make defconfig` ho do .config nedoplni.
+# 1. 9. 2026 to universal build slozilo az na uplnem konci:
+#   ERROR: unable to select packages:
+#     eip197-mini-firmware (no such package):
+#       required by: kmod-crypto-hw-safexcel[eip197-mini-firmware]
+# x8 ho shodou okolnosti vybrany mel, universal ne - proto spadl jen jeden. TARGET_mediatek_filogic ma primo v Depends,
+# Conflicts ma prazdne, takze se nekope ani s kmod-crypto-eip{,-ddk}, ktere
+# v defconfigu zustaly.
+CONFIG_PACKAGE_kmod-crypto-hw-safexcel=y
+CONFIG_PACKAGE_eip197-mini-firmware=y
 BAKE_EOF
 
 # PRIDANO 23. 8.: zavislosti se musi dopocitat i pro to, co pribylo AZ TEDY.
@@ -471,6 +525,26 @@ for _s in libeasy libwifi libwifiutils libieee1905 ieee1905 \
 	esac
 done
 echo ">>> kontrola: mesh vrstva je =y, zapece se do obrazu"
+
+# Look-aside crypto musi PREZIT make defconfig.
+#
+# Duvod na tenhle test: 1. 9. jsme zjistili, ze v .config sedelo
+# CONFIG_PACKAGE_kmod-crypto-eip=y, ale ze sady 9 balicku byly jen 2 - inline
+# crypto se nikdy nesestavilo a osm dni to nikdo nevedel. Stejny den se ukazalo
+# i kmod-mediatek_hnat=y, prestoze driver v kernelu 6.12 vubec neexistuje.
+# Zaver: "napsali jsme =y" a "je to v obrazu" nejsou totez. Kconfig tise
+# vyhodi, cemu nesedi zavislosti, a rekne to jen tomu, kdo se zepta.
+for _s in kmod-crypto-hw-safexcel eip197-mini-firmware; do
+	_v=$(grep -E "^(# )?CONFIG_PACKAGE_${_s}[= ]" .config | tail -1)
+	case "$_v" in
+		*"=y") ;;
+		*) echo "CHYBA: CONFIG_PACKAGE_${_s} neni =y (je: ${_v:-CHYBI})" >&2
+		   echo "       look-aside crypto by se nesestavilo - a u firmware" >&2
+		   echo "       by to spadlo az pri skladani obrazu, po hodine" >&2
+		   exit 1 ;;
+	esac
+done
+echo ">>> kontrola: look-aside crypto (safexcel + eip197 firmware) je =y"
 # conntrack je v te smycce zamerne: mesh-gwd ho vola, kdyz se prestehuje brana,
 # aby klientum strhl toky postavene pro starou cestu. Bez nej to jen poctive
 # zapise do logu, ze nema cim, a klient si 30-90 s pocka, nez mu vyprsi samy

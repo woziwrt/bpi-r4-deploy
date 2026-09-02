@@ -1,108 +1,128 @@
-From 0ee43f4456856b4f70a4d654b7200628732ccc19 Mon Sep 17 00:00:00 2001
 From: Petr Wozniak <petr.wozniak@gmail.com>
-Date: Sat, 30 May 2026 08:13:24 +0200
-Subject: [PATCH net v2] xfrm: propagate -EINPROGRESS from validate_xmit_xfrm()
+Subject: [PATCH] xfrm: propagate -EINPROGRESS and fix stale skb->prev
 
-validate_xmit_xfrm() returns NULL both when a packet is dropped and
-when it is stolen by async crypto (-EINPROGRESS from ->xmit()).
-Callers cannot distinguish the two cases.
+Backport to 6.12 of two mainline commits.  Applied by Steffen Klassert
+(xfrm maintainer) in June 2026, in stable since.  This is the merged
+upstream code, not an earlier posting of it:
 
-f53c723902d1 ("net: Add asynchronous callbacks for xfrm on layer 2.")
-changed the semantics of a NULL return from "dropped" to "stolen or
-dropped", but __dev_queue_xmit() was not updated.  On virtual/bridge
-interfaces (noqueue qdisc) __dev_queue_xmit() initialises rc=-ENOMEM
-and jumps to out: when skb is NULL, returning -ENOMEM to the caller
-even though the packet will be delivered correctly via xfrm_dev_resume().
+  6860b467f569 ("xfrm: propagate -EINPROGRESS from validate_xmit_xfrm()")
+                https://git.kernel.org/linus/6860b467f569
 
-Return ERR_PTR(-EINPROGRESS) for the async case so callers can tell
-it apart from a real drop.  Update validate_xmit_skb_list() to track
-stolen skbs and return ERR_PTR(-EINPROGRESS) when all skbs in the
-list were taken by async crypto.  Update __dev_queue_xmit() to return
-NET_XMIT_SUCCESS in that case.
+  3f4c3919baf0 ("xfrm: fix stale skb->prev after async crypto steals a
+                 GSO segment")
+                https://git.kernel.org/linus/3f4c3919baf0
 
-Fixes: f53c723902d1 ("net: Add asynchronous callbacks for xfrm on layer 2.")
-Suggested-by: Sabrina Dubroca <sd@queasysnail.net>
-Signed-off-by: Petr Wozniak <petr.wozniak@gmail.com>
----
-Changes in v2:
- - Only reset rc to NET_XMIT_SUCCESS when PTR_ERR(skb) == -EINPROGRESS,
-   not for any IS_ERR() result (Sabrina Dubroca)
- - Add comment explaining why rc is reset and the async delivery path
- - Fix validate_xmit_skb_list(): track stolen skbs and return
-   ERR_PTR(-EINPROGRESS) when all skbs in the list were stolen by
-   async crypto, not NULL (Sabrina Dubroca)
+Upstream message of 6860b467f569:
 
- net/core/dev.c         | 15 +++++++++++++--
- net/xfrm/xfrm_device.c |  2 +-
- 2 files changed, 14 insertions(+), 3 deletions(-)
+  validate_xmit_xfrm() returns NULL both when a packet is dropped and
+  when it is stolen by async crypto (-EINPROGRESS from ->xmit()).
+  Callers cannot distinguish the two cases.
 
-diff --git a/net/core/dev.c b/net/core/dev.c
-index 804e8ad25..618e6299f 100644
+  f53c723902d1 ("net: Add asynchronous callbacks for xfrm on layer 2.")
+  changed the semantics of a NULL return from "dropped" to "stolen or
+  dropped", but __dev_queue_xmit() was not updated.  On virtual/bridge
+  interfaces (noqueue qdisc) __dev_queue_xmit() initialises rc=-ENOMEM
+  and jumps to out: when skb is NULL, returning -ENOMEM to the caller
+  even though the packet will be delivered correctly via
+  xfrm_dev_resume().
+
+  Return ERR_PTR(-EINPROGRESS) from validate_xmit_xfrm() for the async
+  case so callers can tell it apart from a real drop.
+
+  Fixes: f53c723902d1
+  Suggested-by: Sabrina Dubroca <sd@queasysnail.net>
+
+Upstream message of 3f4c3919baf0:
+
+  skb_gso_segment() leaves the segment list head with ->prev pointing at
+  the last segment, an invariant validate_xmit_skb_list() relies on when
+  it sets its tail pointer (tail = skb->prev).
+
+  When validate_xmit_xfrm() walks a GSO list and some segments are
+  stolen by async crypto (->xmit() returns -EINPROGRESS), those segments
+  are unlinked from the list but the head ->prev is never updated.  If
+  the last segment is the one stolen, the returned head still has ->prev
+  pointing at it, even though it is now owned by the crypto engine and
+  may be freed.  validate_xmit_skb_list() later does tail->next = skb,
+  writing through that stale pointer -- a use-after-free.
+
+  Fixes: f53c723902d1
+
+Porting note: logic is unchanged from upstream.  Only one hunk needed
+adjusting -- in 6.12 the validate_xmit_skb() call site inside
+__dev_queue_xmit() sits one indentation level deeper.
+
+Hardware verification on MT7988 (BPI-R4, 2026-09-01, tunnel mode,
+rfc4106(gcm(aes)), async crypto active via safexcel on the EIP197):
+
+  without this patch:  41 transmitted / 60 received, -46.3% loss,
+                       40x "sendmsg: Out of memory", 1x duplicate seq
+  with this patch:     60/60, 0% loss, 0 OOM, 0 duplicates
+
+An earlier note here said the async path could not be reached on this
+board.  That was true of the image current at the time, which shipped no
+crypto accelerator; it is not true of the look-aside builds since
+2026-09-01.
+
 --- a/net/core/dev.c
 +++ b/net/core/dev.c
-@@ -3838,7 +3838,8 @@
- struct sk_buff *validate_xmit_skb_list(struct sk_buff *skb, struct net_device *dev, bool *again)
+@@ -3654,6 +3654,9 @@
+ }
+ EXPORT_SYMBOL(skb_csum_hwoffload_help);
+ 
++/* Returns the skb on success, NULL if dropped, or ERR_PTR(-EINPROGRESS)
++ * if stolen by async xfrm crypto (delivered via xfrm_dev_resume()).
++ */
+ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device *dev, bool *again)
  {
- 	struct sk_buff *next, *head = NULL, *tail;
--
-+	bool stolen = false;
-+ 
- 	for (; skb != NULL; skb = next) {
- 		next = skb->next;
- 		skb_mark_not_on_list(skb);
-@@ -3847,8 +3848,11 @@
+ 	netdev_features_t features;
+@@ -3721,7 +3724,7 @@
  		skb->prev = skb;
  
  		skb = validate_xmit_skb(skb, dev, again);
 -		if (!skb)
-+		if (IS_ERR_OR_NULL(skb)) {
-+			if (IS_ERR(skb))
-+				stolen = true;
++		if (IS_ERR_OR_NULL(skb))
  			continue;
-+		}
  
  		if (!head)
- 			head = skb;
-@@ -3859,6 +3863,8 @@
- 		 */
- 		tail = skb->prev;
- 	}
-+	if (!head && stolen)
-+		return ERR_PTR(-EINPROGRESS);
- 	return head;
- }
- EXPORT_SYMBOL_GPL(validate_xmit_skb_list);
-@@ -4553,8 +4559,13 @@
+@@ -4422,8 +4425,11 @@
  				goto recursion_alert;
  
  			skb = validate_xmit_skb(skb, dev, &again);
 -			if (!skb)
--				goto out;
 +			if (IS_ERR_OR_NULL(skb)) {
-+			/* -EINPROGRESS: packet stolen by async xfrm crypto,
-+			 * delivered via xfrm_dev_resume(). */
-+			if (PTR_ERR(skb) == -EINPROGRESS)
-+				rc = NET_XMIT_SUCCESS;
-+			goto out;
++				if (PTR_ERR(skb) == -EINPROGRESS)
++					rc = NET_XMIT_SUCCESS;
+ 				goto out;
 +			}
  
  			HARD_TX_LOCK(dev, txq, cpu);
  
-
-diff --git a/net/xfrm/xfrm_device.c b/net/xfrm/xfrm_device.c
-index 5454be0b2..7702cca2b 100644
 --- a/net/xfrm/xfrm_device.c
 +++ b/net/xfrm/xfrm_device.c
-@@ -188,7 +188,8 @@
+@@ -184,7 +184,7 @@
+ 		err = x->type_offload->xmit(x, skb, esp_features);
+ 		if (err) {
+ 			if (err == -EINPROGRESS)
+-				return NULL;
++				return ERR_PTR(-EINPROGRESS);
  
  			XFRM_INC_STATS(xs_net(x), LINUX_MIB_XFRMOUTSTATEPROTOERROR);
  			kfree_skb(skb);
--			return NULL;
-+			return ERR_PTR(-EINPROGRESS);
-+
- 		}
+@@ -226,7 +226,15 @@
+ 		pskb = skb2;
+ 	}
  
- 		skb_push(skb, skb->data - skb_mac_header(skb));
--- 
-2.51.0
-
+-	return skb;
++	/* skb_gso_segment() set skb->prev to the last segment, but async
++	 * crypto may have stolen it above without updating ->prev.  Repoint
++	 * it at the last retained segment so validate_xmit_skb_list() does
++	 * not chain onto a segment now owned by the crypto engine.
++	 */
++	if (skb)
++		skb->prev = pskb;
++
++	return skb ? skb : ERR_PTR(-EINPROGRESS);
+ }
+ EXPORT_SYMBOL_GPL(validate_xmit_xfrm);
+ 

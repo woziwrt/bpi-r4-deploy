@@ -382,7 +382,7 @@ easymesh_setup_iopsys_feed() {
 	#   odpovidajici tag, ten se odsud nepretahuje)
 	# Bez toho by `git reset --hard` nize kazdy takovy pokus prepsal zpatky
 	# na aktualni pin a build by tise vyrobil dnesek misto vcerejska.
-	local pin=${IOPSYS_PIN:-7819091ff}
+	local pin=${IOPSYS_PIN:-98f26e27a}
 	( cd "${EASYMESH_SHARED}/iopsys-feed" \
 	  && { git rev-parse --verify -q "${pin}^{commit}" >/dev/null 2>&1 || git fetch --all --tags; } \
 	  && git reset --hard "${pin}" && git clean -fd ) || {

@@ -1,0 +1,42 @@
+Allow EIP197 inline/DDK crypto on BPI-R4 (and other filogic MT7988A boards)
+
+CRYPTO_OFFLOAD_INLINE is gated on a list of board names, not on the SoC:
+
+    depends on TARGET_mediatek_mt7988
+            || TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7988a-rfb
+            || TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7988d-rfb
+
+Before eff13a547 (2025-02-18) the condition was TARGET_mediatek_mt7988,
+a subtarget, so every MT7988A board matched.  The refactor replaced it with
+MTK's two reference boards and nobody else's was ever added.
+
+The gate is not a hardware one.  mt7988a-rfb and bananapi_bpi-r4 are the
+same MT7988A silicon, and the crypto and pce nodes both live in the shared
+mt7988a.dtsi with status = "okay":
+
+    crypto@15600000  compatible = "inside-secure,safexcel-eip197b",
+                                  "security-ip-197-srv"   <- MTK DDK binds here
+    pce@15100000     compatible = "mediatek,pce"
+
+Without this, kmod-crypto-eip-inline cannot be selected on a BPI-R4, and with
+it neither kmod-crypto-eip-autoload nor the look-aside code, which is compiled
+into the same crypto-eip-inline.ko (src/Makefile:17-19).  The whole MTK EIP
+driver is unreachable and mainline safexcel is the only option.
+
+Adds the standard BPI-R4 only, in their own style.  That is the board we test
+on; the Pro 8X and the other variants are deliberately left out so this stays
+the smallest possible change to someone else's feed.
+
+A SoC-level condition would be the right upstream fix, not a device list.
+
+--- a/feed/kernel/crypto-eip/Config.in
++++ b/feed/kernel/crypto-eip/Config.in
+@@ -9,7 +9,7 @@
+ 
+ config CRYPTO_OFFLOAD_INLINE
+ 	bool "Inline Mode"
+-	depends on TARGET_mediatek_mt7988 || TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7988a-rfb || TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7988d-rfb
++	depends on TARGET_mediatek_mt7988 || TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7988a-rfb || TARGET_DEVICE_mediatek_filogic_DEVICE_mediatek_mt7988d-rfb || TARGET_DEVICE_mediatek_filogic_DEVICE_bananapi_bpi-r4
+ 	select PACKAGE_kmod-crypto-eip-inline
+ 	select PACKAGE_kmod-crypto-eip-ddk
+ 	select PACKAGE_kmod-crypto-eip-ddk-ksupport

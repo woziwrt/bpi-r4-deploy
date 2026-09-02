@@ -58,7 +58,11 @@ CONFIG_PACKAGE_airoha-en8811h-firmware=y
 CONFIG_PACKAGE_airoha-phy-firmware=y
 CONFIG_PACKAGE_aqr10g-phy-firmware=y
 # CONFIG_PACKAGE_as21xxx-firmware is not set
-CONFIG_PACKAGE_atenl=y
+# CONFIG_PACKAGE_atenl is not set
+# atenl vyhozen 1. 9. 2026 (Petr): obsahuje atenl/ated/iwpriv/mwctl,
+# nic z toho nepouzivame a nic z toho nebezi - overeno na zeleze, ze
+# proces atenl na uzlech NEBEZI (pozor: pgrep -c "[a]tenl" pocita sam sebe).
+# Jediny vyskyt v nasich skriptech byl v SKIP regexu.
 CONFIG_PACKAGE_attendedsysupgrade-common=y
 CONFIG_PACKAGE_avahi-dbus-daemon=y
 CONFIG_PACKAGE_blkid=y
@@ -189,7 +193,15 @@ CONFIG_PACKAGE_kmod-lib-zlib-inflate=y
 CONFIG_PACKAGE_kmod-lib-zstd=y
 CONFIG_PACKAGE_kmod-libphy=y
 CONFIG_PACKAGE_kmod-mac80211=y
-CONFIG_PACKAGE_kmod-mediatek_hnat=y
+# CONFIG_PACKAGE_kmod-mediatek_hnat is not set
+# Vyhozeno 1. 9. 2026: PRAZDNY balicek (673 B, zadny .ko).
+# Driver mtk_hnat v kernelu 6.12 NEEXISTUJE - drivers/net/ethernet/mediatek/
+# neobsahuje zadny *hnat* zdrojak, takze se nevygeneruje ani symbol
+# CONFIG_NET_MEDIATEK_HNAT. Je to relikt z casu kernelu 5.4.
+# HW offload dnes dela MAINLINE PPE, zakompilovany napevno
+# (CONFIG_NET_MEDIATEK_SOC=y, mtk_ppe.c + 46 patchu 999-ppe-*), takze
+# v lsmod nebude nikdy - a presto funguje: overeno 1. 9. zaznamy BND
+# v /sys/kernel/debug/mtk_ppe/ vcetne NAT prekladu v hardwaru.
 CONFIG_PACKAGE_kmod-mii=y
 CONFIG_PACKAGE_kmod-mmc=y
 CONFIG_PACKAGE_kmod-mppe=y
@@ -391,7 +403,14 @@ CONFIG_PACKAGE_mt76-test=y
 CONFIG_PACKAGE_mt7988-wo-firmware=y
 CONFIG_PACKAGE_mt798x-2p5g-phy-firmware-internal=y
 # CONFIG_PACKAGE_mtk_factory_rw is not set
-CONFIG_PACKAGE_mtkhnat_util=y
+# CONFIG_PACKAGE_mtkhnat_util is not set
+# Vyhozeno 1. 9. 2026 spolu s kmod-mediatek_hnat.
+# Prazdny NENI (3151 B), ale co instaluje je HQoS demon se 128 frontami
+# (/sbin/mtkhnat + S19mtkhnat), ktery se pri bootu spusti a s vychozim
+# 'option hqos 0' nedela nic. NENI to prepinac NAT offloadu - ten se
+# nezapina, uz je zapnuty (nft flowtable ma 'flags offload').
+# Overeno, ze na nem nic nezavisi: zadny nas skript ho nezminuje a zadny
+# balicek ho nema v Depends.
 CONFIG_PACKAGE_musl-fts=y
 # CONFIG_PACKAGE_mwan3 is not set
 CONFIG_PACKAGE_netfilter-flowtable=y
@@ -597,3 +616,11 @@ CONFIG_PACKAGE_zerotier=y
 CONFIG_PACKAGE_kmod-vxlan=y
 CONFIG_PACKAGE_kmod-bonding=y
 CONFIG_PACKAGE_ieee1905-topology-plugin=y
+
+# scp / rsync / GUI SFTP na router (2. 9. 2026).
+# Dropbear sam sftp podsystem nema, je to samostatny balicek (~30 kB).
+# Novejsi scp (OpenSSH 9+) vola SFTP jako vychozi protokol, takze bez nej
+# kazdy scp na router skonci na /usr/libexec/sftp-server: not found a musi
+# se obchazet pres scp -O nebo rourou cat | ssh.
+# Staci sem: x8 builder tenhle soubor pouziva jako _BASE a pridava jen deltu.
+CONFIG_PACKAGE_openssh-sftp-server=y

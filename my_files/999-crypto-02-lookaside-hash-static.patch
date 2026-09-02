@@ -1,0 +1,28 @@
+crypto-eip: make mtk_crypto_zero_hmac_setkey static
+
+Building with CRYPTO_MTK_DDK_LOOKASIDE=y and CRYPTO_OFFLOAD_INLINE=y at the
+same time fails:
+
+  lookaside-hash.c:599:5: error: no previous prototype for
+      'mtk_crypto_zero_hmac_setkey' [-Werror=missing-prototypes]
+
+The function is defined at line 599 and used once, at line 712, in the same
+file.  Nothing outside lookaside-hash.c references it and no header declares
+it, so static is the right fix.
+
+The two config symbols are independent in Config.in (CRYPTO_MTK_DDK_LOOKASIDE
+sits outside the "Crypto Offload Mode" choice), but the combination appears
+never to be built by MediaTek - lookaside-hash.c is only compiled when the
+look-aside symbol is set, and the module it lands in is crypto-eip-inline.ko.
+
+--- a/feed/kernel/crypto-eip/src/lookaside-hash.c
++++ b/feed/kernel/crypto-eip/src/lookaside-hash.c
+@@ -596,7 +596,7 @@
+ 	return crypto_ahash_export(areq, state);
+ }
+ 
+-int mtk_crypto_zero_hmac_setkey(const char *alg, const u8 *key, unsigned int keylen,
++static int mtk_crypto_zero_hmac_setkey(const char *alg, const u8 *key, unsigned int keylen,
+ 			   void *istate)
+ {
+ 	struct ahash_request *areq;

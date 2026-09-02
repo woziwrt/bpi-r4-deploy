@@ -33,7 +33,7 @@ bytes() {
 
 set_map() {
 	hostapd_cli -i "$IF" negotiated_ttlm request "$S" \
-		dir=2 def_link_map=0 link_map_size=1 num_tids=8 \
+		dir=2 def_link_map=0 link_map_size=0 num_tids=8 \
 		0 "$1" 1 "$1" 2 "$1" 3 "$1" 4 "$1" 5 "$1" 6 "$1" 7 "$1" >/dev/null 2>&1
 	sleep 3
 }

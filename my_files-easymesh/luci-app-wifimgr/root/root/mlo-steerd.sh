@@ -248,7 +248,7 @@ neg_ttlm_set() {
     bg=$(( active & 3 )); [ "$bg" -eq 0 ] && bg="$active"
 
     hostapd_cli -i "$MLO_IF" negotiated_ttlm request "$mac" \
-        dir=2 def_link_map=0 link_map_size=1 num_tids=8 \
+        dir=2 def_link_map=0 link_map_size=0 num_tids=8 \
         0 "$be" 1 "$bg" 2 "$bg" 3 "$be" \
         4 "$video" 5 "$video" 6 "$voice" 7 "$voice" >/dev/null 2>&1
 }

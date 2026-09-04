@@ -355,7 +355,13 @@ easymesh_archive_build() {
 # na disku VM1. Od 25. 7. je zrcadleno:
 #
 #   remote woziwrt = https://github.com/woziwrt/iopsys-feed.git  (private)
-#   branch devel, pin 2026-08-17 -> f6ef57f45 (map-agent: a join in progress must
+#   branch devel, pin 2026-09-04 -> 232c86308 (map-agent: an ap section the
+#   controller never sent is not the controller to delete - the bhmld_ap_<band>
+#   bookkeeping placeholders stopped being deleted and claimed, and a generated
+#   ifname is now checked against the sections it is actually written into)
+#   predchozi pin 14c5375ca: libwifi ctrl socket must follow the requested band,
+#   and fix the AKM copy
+#   predchozi pin f6ef57f45: (map-agent: a join in progress must
 #   pass the genconfig gate)
 #   predchozi pin f90c7d135: (map-agent: the genconfig hotplug
 #   must not rewrite wireless on a box with no mesh role - a factory-fresh
@@ -382,7 +388,7 @@ easymesh_setup_iopsys_feed() {
 	#   odpovidajici tag, ten se odsud nepretahuje)
 	# Bez toho by `git reset --hard` nize kazdy takovy pokus prepsal zpatky
 	# na aktualni pin a build by tise vyrobil dnesek misto vcerejska.
-	local pin=${IOPSYS_PIN:-14c5375ca}
+	local pin=${IOPSYS_PIN:-232c86308}
 	( cd "${EASYMESH_SHARED}/iopsys-feed" \
 	  && { git rev-parse --verify -q "${pin}^{commit}" >/dev/null 2>&1 || git fetch --all --tags; } \
 	  && git reset --hard "${pin}" && git clean -fd ) || {

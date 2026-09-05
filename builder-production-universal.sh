@@ -59,6 +59,23 @@ rm -rf mtk-openwrt-feeds
 git clone --reference-if-able "$HOME/mirrors/openwrt.git" --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt
 cd openwrt; git checkout ${OPENWRT_COMMIT}; cd -;
 
+# Stahovani mimo strom, od prvniho bajtu.
+#
+# Radek 15 je `rm -rf openwrt`, takze openwrt/dl - vcetne 794 MB go-mod-cache -
+# umira pred kazdym buildem a stahuje se znovu. 5. 9. to stalo hodinu na 502 od
+# ftpmirror.gnu.org a x8 build spadl uplne, protoze proxy.golang.org neodpovedelo
+# pri stahovani Go modulu pro tailscale.
+#
+# CONFIG_DOWNLOAD_FOLDER by na to stacilo, ale zapisuje se az do .config nize -
+# tedy AZ ZA `autobuild.sh prepare`, ktery uz stahuje. Mereno 5. 9.: nez se k tomu
+# radku build dostal, lezelo v openwrt/dl 611 MB linux-firmware, ktere v
+# ~/dl-shared uz bylo. Symlink plati od prvniho stazeni.
+#
+# Neni to tentyz nesvar jako .git/info/sparse-checkout: ten byl neverzovany a jen
+# na jednom stroji, tenhle radek je v gitu a jde s builderem.
+mkdir -p "$HOME/dl-shared"
+ln -sfn "$HOME/dl-shared" openwrt/dl
+
 # A totez pro feedy uvnitr stromu. Prvni z dnesnich dvou padu nebyl na openwrt.git,
 # ale prave tady: feeds.conf.default miri z vyroby na git.openwrt.org, takze
 # `scripts/feeds update -a` klonuje odtamtud - a kdyz to nejede, nejede build.
@@ -344,11 +361,25 @@ cat >> .config <<'BAKE_EOF'
 # Not a package: 1905 frames must carry the AL-MAC as source address.
 # easymesh_apply_defconfig does NOT set this one.
 CONFIG_IEEE1905_CMDU_SA_IS_ALMAC=y
-# Stahovani mimo strom. Kazdy build zacina `rm -rf openwrt` (r. 15), takze
-# openwrt/dl vcetne go-mod-cache umira pokazde znovu - 5. 9. to bylo 2,3 GB
-# stazenych dvakrat, a x8 build spadl na tom, ze proxy.golang.org neodpovedelo
-# pri stahovani Go modulu pro tailscale. Slozka mimo strom to prezije.
-CONFIG_DOWNLOAD_FOLDER="/home/ipsec/dl-shared"
+# SDK a ImageBuilder: rychla smycka pro praci, ktera se nedotyka jadra.
+#
+# EasyMesh je cely v uzivatelskem prostoru - 7 balicku shellu/rpcd/LuCI a 156
+# patchu do map-agent, map-controller, libwifi a ieee1905, coz jsou vsechno
+# demoni. Do jadra nesaha ani jednou (13 kernelovych patchu v my_files patri
+# ulozisti, ethernetu, SFP a BTWT, ne EasyMeshi).
+#
+# Presto stoji zmena jednoho radku v shellu cely build od nuly, protoze radek 15
+# maze strom. Ctyri hodiny za jednoradkovou opravu znamenaji, ze nikdo nedela male
+# kroky a vsichni davkuji - a davkovani je presne to, co nas 4. 9. dostalo tam,
+# kde jsme.
+#
+# S temito dvema radky vyrobi kazdy plny build i SDK a ImageBuilder. Pak:
+#   zmena v shellu -> SDK prelozi balicek (vteriny)
+#   -> ImageBuilder slozi obraz (minuty) -> sysupgrade, tedy zadna zmena postupu.
+#
+# Plati pro pin, ze ktereho vznikly. Posun pinu nebo zasah do jadra = plny build.
+CONFIG_SDK=y
+CONFIG_IB=y
 # netsys_dbg.sh - vypis registru ethernetoveho NETSYS od MTK. x8 ho mel,
 # universal ne, prestoze ethernet ladime prave tady. MTK do nej mezi 18. 8.
 # a 4. 9. pridal ADMA/WDMA/TDMA ring dump a vic registru pro SGMII.
@@ -595,8 +626,9 @@ echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-emmc-comb-4bg=y" >> .config
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-sdmmc-comb-4bg=y" >> .config
 echo "CONFIG_PACKAGE_trusted-firmware-a-mt7988-spim-nand-ubi-comb-4bg=y" >> .config
 
-### OpenWrt SDK (per-target = covers all variants incl. Pro 8X) - published as release-sdk
-#echo "CONFIG_SDK=y" >> .config
+### OpenWrt SDK: zapina se vys v bloku BAKE_EOF, spolu s CONFIG_IB=y.
+### Tenhle zakomentovany pokus tu byl od drivejska bez uvedeneho duvodu; nechavat
+### dva zaznamy o teze veci je presne to, co se 5. 9. hledalo cely den.
 
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic build
 

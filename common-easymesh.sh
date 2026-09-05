@@ -319,6 +319,23 @@ easymesh_archive_build() {
 	find "$root/bin/packages" -name '*.apk' \( -path '*easymeshr6*' -o -path '*iopsys*' \) \
 		-exec cp -n {} "$dst/packages/" \; 2>/dev/null
 
+	# PRIDANO 5. 9.: SDK a ImageBuilder. Vznikaji v bin/targets vedle obrazu,
+	# ale find vyse bere jen .itb a .img.gz, takze se nikdy nearchivovaly a
+	# zustavaly ve stromu, ktery pristi build maze na radku 15. Prvni dvojici
+	# (5. 9. 14:42) se muselo zachranovat rucne.
+	#
+	# Proc na tom zalezi: EasyMesh je cely v uzivatelskem prostoru, takze s SDK
+	# stoji oprava jednoho radku vteriny misto hodin - ale jen dokud to SDK
+	# existuje. Bez archivace by zmizelo pri nejblizsim buildu, tedy presne
+	# tehdy, kdy uz je zaplacene.
+	for _s in "$root"/bin/targets/*/*/openwrt-sdk-*.tar.zst \
+	          "$root"/bin/targets/*/*/openwrt-imagebuilder-*.tar.zst; do
+		[ -f "$_s" ] || continue
+		mkdir -p "$dst/sdk"
+		cp -n "$_s" "$dst/sdk/" 2>/dev/null
+	done
+	[ -d "$dst/sdk" ] && ( cd "$dst/sdk" && md5sum *.tar.zst > MD5SUMS.txt 2>/dev/null )
+
 	{
 		echo "varianta : $variant"
 		echo "postaveno: $stamp"
@@ -331,6 +348,13 @@ easymesh_archive_build() {
 				"$(git -C "${EASYMESH_SHARED}/$t" describe --tags --exact-match HEAD 2>/dev/null || echo 'bez znacky')"
 		done
 		[ -d "$root/.git" ] && printf "  %-18s %s\n" "openwrt" "$(git -C "$root" rev-parse HEAD)"
+		# PRIDANO 5. 9.: mtk-openwrt-feeds v receptu chybel, a je to pulka
+		# buildu - vsechny ethernetove, wifi a DTS patche jdou odtud. Z manifestu
+		# tedy doted neslo zjistit, z jakeho MTK snapshotu obraz vznikl, a za mesic
+		# by to nesel zopakovat. Tim spis u SDK: obraz aspon nekam nasadis a poznas,
+		# jak se chova, SDK ti bez receptu nerekne nic.
+		_mtk="$(dirname "$root")/mtk-openwrt-feeds"
+		[ -d "$_mtk/.git" ] && printf "  %-18s %s\n" "mtk-openwrt-feeds" "$(git -C "$_mtk" rev-parse HEAD)"
 		for t in packages luci routing telephony video; do
 			[ -d "$root/feeds/$t/.git" ] && printf "  %-18s %s\n" "feeds/$t" "$(git -C "$root/feeds/$t" rev-parse HEAD)"
 		done
@@ -338,6 +362,7 @@ easymesh_archive_build() {
 		echo "OBSAH"
 		ls -1 "$dst/images" 2>/dev/null | sed 's|^|  images/|'
 		ls -1 "$dst/packages" 2>/dev/null | sed 's|^|  packages/|'
+		ls -1 "$dst/sdk" 2>/dev/null | sed 's|^|  sdk/|'
 	} > "$dst/MANIFEST.txt"
 
 	echo ">>> archiv: $dst  ($(du -sh "$dst" 2>/dev/null | cut -f1))"

@@ -336,6 +336,23 @@ easymesh_archive_build() {
 	done
 	[ -d "$dst/sdk" ] && ( cd "$dst/sdk" && md5sum *.tar.zst > MD5SUMS.txt 2>/dev/null )
 
+	# PRIDANO 5. 9.: produkcni seznam balicku k SDK.
+	#
+	# ImageBuilder slozi obraz z toho, co mu vyjmenujes - a kdyz vyjmenujes malo,
+	# udela to bez varovani. Zmereno tehoz dne: se seznamem jen nasich balicku
+	# vznikl obraz o 16 MB proti produkcnim 125 MB, a nic to nereklo. Aby se dal
+	# obraz slozit doslova takovy, jaky byl, musi jit seznam s SDK.
+	#
+	# .manifest zapisuje build sam a ma tvar "jmeno - verze"; PACKAGES.txt je z nej
+	# jedna radka jmen, tedy presne to, co ceka `make image PACKAGES="..."`.
+	for _m in "$root"/bin/targets/*/*/*.manifest; do
+		[ -f "$_m" ] || continue
+		mkdir -p "$dst/sdk"
+		cp -n "$_m" "$dst/sdk/" 2>/dev/null
+		awk '{print $1}' "$_m" | tr '\n' ' ' > "$dst/sdk/PACKAGES.txt"
+		echo >> "$dst/sdk/PACKAGES.txt"
+	done
+
 	{
 		echo "varianta : $variant"
 		echo "postaveno: $stamp"

@@ -8,7 +8,8 @@
 # Pousti se pres img-universal.sh nebo img-x8.sh, ne primo.
 set -e
 
-VARIANT="${1:?pouziti: img-build.sh universal|x8}"
+VARIANT="${1:?pouziti: img-build.sh universal|x8 [priprav]}"
+JEN_PRIPRAV="${2:-}"
 case "$VARIANT" in
 	universal) GLOB='*-production';    PROFILE=bananapi_bpi-r4 ;;
 	x8)        GLOB='*-production-x8'; PROFILE=bananapi_bpi-r4-pro-8x ;;
@@ -84,6 +85,11 @@ if [ -n "$chybi" ]; then
 	echo "STOP: v ImageBuilderu chybi tyhle balicky ze seznamu varianty $VARIANT:" >&2
 	for p in $chybi; do echo "        $p" >&2; done
 	exit 1
+fi
+
+if [ "$JEN_PRIPRAV" = priprav ]; then
+	echo ">>> ImageBuilder je pripraveny: $IBD"
+	exit 0
 fi
 
 # --- slozit ----------------------------------------------------------------

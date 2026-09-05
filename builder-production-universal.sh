@@ -380,6 +380,12 @@ CONFIG_IEEE1905_CMDU_SA_IS_ALMAC=y
 # Plati pro pin, ze ktereho vznikly. Posun pinu nebo zasah do jadra = plny build.
 CONFIG_SDK=y
 CONFIG_IB=y
+# IB_STANDALONE je povinne. Bez nej ma ImageBuilder v `repositories` adresy na
+# downloads.openwrt.org - vcetne feedu easymeshr6, iopsys a mtk_openwrt_feed,
+# ktere tam neexistuji - a uvnitr jen tri balicky. Zmereno 5. 9.: musel jsem mu
+# repozitare rucne prepsat na disk, jinak by nesestavil nic. S touhle volbou si
+# nese vlastni repozitar a pracuje offline.
+CONFIG_IB_STANDALONE=y
 # netsys_dbg.sh - vypis registru ethernetoveho NETSYS od MTK. x8 ho mel,
 # universal ne, prestoze ethernet ladime prave tady. MTK do nej mezi 18. 8.
 # a 4. 9. pridal ADMA/WDMA/TDMA ring dump a vic registru pro SGMII.

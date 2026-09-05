@@ -359,6 +359,26 @@ easymesh_archive_build() {
 		echo >> "$dst/sdk/PACKAGES.txt"
 	done
 
+	# PRIDANO 5. 9. vecer: `files/` overlay, tedy soubory PECENE do obrazu.
+	#
+	# Bez nej je archiv neuplny zpusobem, ktery se PRI POHLEDU NA VYSLEDEK
+	# NEPOZNA. ImageBuilder slozi obraz jen z balicku; techto 11 souboru
+	# (uci-defaults s hostnamem a LED fixem, /etc/easymesh-model, preinit
+	# 19-expand-fit-rootfs, instalacni skripty) mu musi prijit zvlast pres
+	# `FILES=`. Obraz bez nich nabehne, tvari se spravne - a nema hostname,
+	# nema model, nerozsiri rootfs. Presne ta trida vad, kterou hledame dny.
+	if [ -d "$root/files" ]; then
+		mkdir -p "$dst/files"
+		cp -a "$root/files/." "$dst/files/" || {
+			echo "archiv: files/ overlay se nepodarilo zkopirovat" >&2
+			return 1
+		}
+		( cd "$dst" && find files -type f | sort > FILES.txt )
+		echo ">>> archiv: files/ overlay ($(find "$dst/files" -type f | wc -l) souboru)"
+	else
+		echo "archiv: POZOR - $root/files neexistuje, obraz z IB bude bez pecenych souboru" >&2
+	fi
+
 	{
 		echo "varianta : $variant"
 		echo "postaveno: $stamp"

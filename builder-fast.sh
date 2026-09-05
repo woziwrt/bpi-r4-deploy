@@ -119,8 +119,26 @@ cp -f "$SDKD"/bin/packages/*/*/*.apk "$IBD/packages/" 2>/dev/null || true
 # proti produkcnim 125 MB. Proto se bere ten, ktery build zapsal.
 PKGS="${PACKAGES:-$(cat "$ARCH/sdk/PACKAGES.txt" 2>/dev/null)}"
 [ -n "$PKGS" ] || { echo "FATAL: chybi $ARCH/sdk/PACKAGES.txt a PACKAGES neni nastaveno." >&2; exit 1; }
-echo ">>> skladam obraz, profil $PROFILE, $(echo $PKGS | wc -w) balicku"
-( cd "$IBD" && make image PROFILE="$PROFILE" PACKAGES="$PKGS" >/tmp/fast-ib.log 2>&1 ) \
+
+# `files/` overlay. ImageBuilder pece do obrazu jen balicky - tohle jsou soubory,
+# ktere v zadnem balicku nejsou: uci-defaults s hostnamem a LED fixem,
+# /etc/easymesh-model, preinit 19-expand-fit-rootfs, instalacni skripty.
+#
+# Bez `FILES=` obraz NABEHNE a bude vypadat spravne, jen nebude mit hostname,
+# model ani rozsireny rootfs. Nic to nerekne. Proto se tu radeji zastavime.
+FILESDIR="$ARCH/files"
+if [ ! -d "$FILESDIR" ]; then
+	echo "STOP: $FILESDIR neexistuje - tenhle archiv vznikl pred 5. 9. vecer," >&2
+	echo "      kdy se files/ overlay jeste nearchivoval." >&2
+	echo "      Obraz by nabehl, ale bez hostname, /etc/easymesh-model a" >&2
+	echo "      rozsireni rootfs - a nepoznalo by se to. Bud dopln overlay do" >&2
+	echo "      archivu, nebo spust s FAST_ALLOW_NO_FILES=1 (obraz NENI produkcni)." >&2
+	[ "${FAST_ALLOW_NO_FILES:-0}" = "1" ] || exit 1
+	FILESDIR=""
+fi
+
+echo ">>> skladam obraz, profil $PROFILE, $(echo $PKGS | wc -w) balicku${FILESDIR:+, overlay $(find "$FILESDIR" -type f | wc -l) souboru}"
+( cd "$IBD" && make image PROFILE="$PROFILE" PACKAGES="$PKGS" ${FILESDIR:+FILES="$FILESDIR"} >/tmp/fast-ib.log 2>&1 ) \
 	|| { echo "FATAL: make image selhal, viz /tmp/fast-ib.log" >&2; tail -20 /tmp/fast-ib.log >&2; exit 1; }
 
 echo

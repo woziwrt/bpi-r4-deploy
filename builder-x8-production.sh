@@ -32,7 +32,17 @@ easymesh_require_clean_trees
 # BUMP 2026-06-28 (HW overeno na obou routerech; predchozi: 7b8ce1e / 42c9ff = 6.12.93):
 #   OpenWrt:  4d0fec5a4845ba166203a782d08217b3f1cf2af9  (openwrt-25.12 HEAD)
 #   MTK SDK:  b7873eae800034c05f8f6257b55949d6464eb2e3  (github main HEAD)
-OPENWRT_COMMIT=${OPENWRT_COMMIT:-4a5c6b90d21522d2663ce2718c973f9e845f2119}
+# BUMP 2026-09-05 (predchozi: OpenWrt 4a5c6b90d2 / MTK 4e825214de, oboje 18. 8.):
+#   OpenWrt:  30d53697c798e61043da296681b9c219ef6b484b  (openwrt-25.12 HEAD, 3. 9.)
+#   MTK SDK:  6aeae9ebfba5b2dd815b1542992abd12db975f8d  (github main HEAD, 4. 9.)
+#
+# Kernel se nemeni: target/linux/generic/kernel-6.12 rika .103 na obou pinech,
+# vcetne shodneho LINUX_KERNEL_HASH. Overeno proti ~/mirrors/openwrt.git.
+#
+# Oba piny jdou prebit z prostredi:
+#   MTK_COMMIT=<sha> OPENWRT_COMMIT=<sha> ./builder-x8-production.sh
+OPENWRT_COMMIT=${OPENWRT_COMMIT:-30d53697c798e61043da296681b9c219ef6b484b}
+MTK_COMMIT=${MTK_COMMIT:-6aeae9ebfba5b2dd815b1542992abd12db975f8d}
 
 rm -rf openwrt
 rm -rf mtk-openwrt-feeds
@@ -70,6 +80,18 @@ rm -rf mtk-openwrt-feeds
 git clone --reference-if-able "$HOME/mirrors/openwrt.git" --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt
 cd openwrt; git checkout ${OPENWRT_COMMIT}; cd -;
 
+# Stahovani mimo strom, od prvniho bajtu.
+#
+# Radek s `rm -rf openwrt` vys maze cely strom vcetne openwrt/dl a jeho
+# go-mod-cache (794 MB), takze se pred kazdym buildem stahuje znovu. 5. 9. to
+# stalo hodinu na 502 od ftpmirror.gnu.org a jeden build spadl uplne, protoze
+# proxy.golang.org neodpovedelo pri stahovani Go modulu pro tailscale.
+#
+# CONFIG_DOWNLOAD_FOLDER by na to stacilo, ale zapisuje se az do .config nize,
+# tedy AZ ZA `autobuild.sh prepare`, ktery uz stahuje. Symlink plati hned.
+mkdir -p "$HOME/dl-shared"
+ln -sfn "$HOME/dl-shared" openwrt/dl
+
 # A totez pro feedy uvnitr stromu. Prvni z dnesnich dvou padu nebyl na openwrt.git,
 # ale prave tady: feeds.conf.default miri z vyroby na git.openwrt.org, takze
 # `scripts/feeds update -a` klonuje odtamtud - a kdyz to nejede, nejede build.
@@ -80,7 +102,7 @@ sed -i -e "s|https://git.openwrt.org/feed/|https://github.com/openwrt/|g" \
 # BUMP TEST 2026-06-23: tarball nahrazen cerstvym clone z MTK GitHub (vetev main = nase linie)
 #tar xzf /home/ipsec/mtk-feeds-cache.tar.gz
 git clone --reference-if-able "$HOME/mirrors/mtk-feeds.git" --branch main https://github.com/mediatek/mtk-openwrt-feeds mtk-openwrt-feeds
-( cd mtk-openwrt-feeds && git checkout 4e825214deaafc5cdc5457d66a1a828449f07e69 )
+( cd mtk-openwrt-feeds && git checkout ${MTK_COMMIT} )
 
 # mt76-vendor: air-monitor MAC as six bytes, not as a nest of six u8.
 # Without it `mt76-vendor <dev> set amnt <idx> <mac>` always answers
@@ -96,7 +118,14 @@ patch -p1 -d mtk-openwrt-feeds < my_files/999-vendor-01-amnt-macaddr-flat.patch
 \cp -r my_files/999-sfp-22-rtl8261be-boot-1g-reprobe.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-eth-21-mtk-gdm-rx-fsm-reset.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-pcs-10-lynxi-hold-link-down-on-invalid-speed.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
-\cp -r my_files/999-ephy-zz-01-fix-aqr-mib-thread-lifetime.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+# 999-ephy-zz-01-fix-aqr-mib-thread-lifetime.patch se uz nekopiruje.
+#
+# MTK ho prevzal 2026-09-02 jako fc14f9a a je od pinu 6aeae9ebf primo v jejich
+# 999-ephy-aqr113c-04-add-mib-debugfs.patch, s ctyrmi opravami navic: priv->mib_lock,
+# cast msw na u32, %llu misto %lld a dirname[] na 8 bajtu.
+#
+# VAZANO NA PIN: pri navratu na MTK pin starsi nez 6aeae9ebf musi tento radek zpet,
+# jinak v obrazu neni ANI JEDNA verze a panic pri vytazeni AQR113C SFP se vraci.
 \cp -r my_files/999-fix-01-mac80211-btwt-ap-mode.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mac80211/patches/subsys/0139-fix-mac80211-btwt-ap-mode-he-btwt-supported.patch
 \cp -r my_files/999-fix-00-xfrm-propagate-einprogress.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/0264-wpa_s-add-btwt-join-command.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/network/services/hostapd/patches/0264-wpa_s-add-btwt-join-command.patch
@@ -429,6 +458,27 @@ cat >> .config <<'BAKE_EOF'
 # Not a package: 1905 frames must carry the AL-MAC as source address.
 # easymesh_apply_defconfig does NOT set this one.
 CONFIG_IEEE1905_CMDU_SA_IS_ALMAC=y
+# SDK a ImageBuilder: rychla smycka pro praci, ktera se nedotyka jadra.
+#
+# EasyMesh je cely v uzivatelskem prostoru, presto stoji zmena jednoho radku
+# v shellu cely build od nuly. Zmereno 5. 9. na hotovem SDK: rozbalit 1,4 s,
+# feeds 2,7 s, defconfig 2,0 s, prelozit balicek 5,5 s, slozit obraz 17,6 s -
+# tedy pul minuty proti 45 minutam.
+#
+# IB_STANDALONE je povinne: bez nej mi ImageBuilder ukazal `repositories` mirici
+# na downloads.openwrt.org, kde nase feedy neexistuji, a uvnitr mel tri balicky.
+# S nim si nese vlastni repozitar a funguje offline.
+#
+# Plati pro pin, ze ktereho vznikly. Posun pinu nebo zasah do jadra = plny build.
+CONFIG_SDK=y
+CONFIG_IB=y
+CONFIG_IB_STANDALONE=y
+# netsys_dbg.sh - vypis registru ethernetoveho NETSYS od MTK. Prichazel sem
+# z MTK defconfigu; vypsat vlastnim radkem, at nezmizi s jeho zmenou.
+CONFIG_PACKAGE_netsys_dbg_util=y
+# memdump - vypis pameti pres ATF pri panicu (kernelovy patch 700-... je ve stromu,
+# tohle je jeho konfiguracni pomocnik). Pozor: spousti se na PANIC, ne na watchdog.
+CONFIG_PACKAGE_kmod-memdump-cfg=y
 # Ty dva zijí v produkčním DEVICE defconfigu (my_defconfig-production-universal),
 # který tenhle builder nepoužívá - má vlastní, Pro-8X. Patří sem, ne tam: pak je
 # jedno, s jakým device defconfigem se builder spustí, a pojistka níž je najde.
@@ -440,6 +490,10 @@ CONFIG_PACKAGE_easymesh-api=y
 CONFIG_PACKAGE_easymesh-config=y
 CONFIG_PACKAGE_easymesh-mesh=y
 CONFIG_PACKAGE_easymesh-wifi=y
+# easymesh-core: knihovna, kterou easymesh-api sourcuje (db.sh, names.sh, sys.sh).
+# Vypsat rucne: radky v tomhle bloku se dopisuji az ZA `make defconfig`, takze
+# kconfig zavislost z DEPENDS nikdy nedopocita. Universal build na tom 5. 9. spadl.
+CONFIG_PACKAGE_easymesh-core=y
 # Measurement scaffolding, deliberately baked in for now.
 #
 # The hooks live inside other packages' scripts, so they cannot be added after
@@ -652,8 +706,8 @@ if [ "$_dev" -eq 0 ]; then
 fi
 echo ">>> kontrola: vybranych zarizeni: $_dev"
 
-### OpenWrt SDK (per-target = covers all variants incl. Pro 8X) - published as release-sdk
-#echo "CONFIG_SDK=y" >> .config
+### OpenWrt SDK: zapina se vys v bloku BAKE_EOF, spolu s CONFIG_IB a IB_STANDALONE.
+### Tenhle zakomentovany pokus tu byl od drivejska bez uvedeneho duvodu.
 
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic build
 

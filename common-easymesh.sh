@@ -287,10 +287,16 @@ easymesh_require_clean_trees() {
 }
 
 # --- 6) archiv vystupu -------------------------------------------------------
-# Oba buildery zacinaji `rm -rf openwrt` a sdileji tyz adresar, takze kazdy
-# build smaze uplne vsechno po tom predchozim - vcetne obrazu druhe varianty.
-# Dva samostatne stromy by to vyresily, ale nevejdou se na disk (~53 GB kazdy).
-# Odlozit si vystup je levnejsi a resi to, na cem zalezi.
+# Kazdy builder zacina `rm -rf openwrt` ve SVEM strome (`~/universal-new/openwrt`
+# vs `~/x8-new/openwrt`), takze si maze jen vlastni predchozi vysledek - obrazy
+# druhe varianty jsou v bezpeci a oba buildery smi bezet SOUBEZNE.
+#
+# (Do 5. 9. 2026 tu stalo, ze buildery sdileji tyz adresar. To uz neplati od
+# rozdeleni stromu a svadelo to k zaveru, ze se souběžne poustet nesmi. Zakaz
+# souběhu plati jen na dva buildy do TEHOZ stromu - builder nema zamek.)
+#
+# Archiv presto potrebujeme: strom se pri pristim buildu te SAME varianty smaze
+# cely, vcetne SDK a ImageBuilderu, ktere se stavi hodiny.
 #
 # Krome binarek se zapisuje i RECEPT. Bez nej jsou obrazy neopakovatelne:
 # feeds.conf.default pinuje upstream feedy jen VETVI (`;openwrt-25.12`), takze

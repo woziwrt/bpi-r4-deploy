@@ -24,7 +24,29 @@ ARCH="${2:-$(ls -dt "$HOME"/archiv/*/ 2>/dev/null | while read d; do [ -d "$d/sd
 [ -n "$ARCH" ] && [ -d "$ARCH/sdk" ] || { echo "FATAL: nenasel jsem archiv s sdk/. Spust nejdriv plny build." >&2; exit 1; }
 ARCH="${ARCH%/}"
 SHARED="${EASYMESH_SHARED:-$HOME/easymesh-shared}"
-WORK="${WORK:-$HOME/fast-work}"
+# Pracovni adresar je NA VARIANTU, stejne jako v img-build.sh. Do 2026-09-06 byl
+# jeden spolecny, takze v nem zustalo SDK a IB te varianty, ktera se stavela
+# naposled - a druha do nej pak cpala svuj seznam balicku. Projevi se to jako
+# "no such package" u kmod-crypto-eip-*, tedy jako chybejici balicky, a neni to
+# ono: je to ImageBuilder z jineho buildu.
+WORK="${WORK:-$HOME/fast-work/$PROFILE}"
+
+# Archiv se vybira jako NEJNOVEJSI se slozkou sdk/, bez ohledu na to, pro kterou
+# variantu je - takze `./builder-fast.sh bananapi_bpi-r4` bez druheho argumentu
+# sahne po x8 SDK, kdyz je novejsi. Obe varianty maji tentyz target, takze by z
+# toho vylezl obraz, ktery NABEHNE a bude vypadat spravne, jen bude slozeny
+# napul z jednoho buildu a napul z druheho. Kdyz jmeno archivu variantu nese,
+# radeji se zastavime.
+case "$PROFILE" in
+	*pro-8x*) case "$ARCH" in *x8*) ;; *)
+		echo "FATAL: profil '$PROFILE' je x8, ale archiv vypada na universal:" >&2
+		echo "       $ARCH" >&2
+		echo "       Predej spravny archiv druhym argumentem." >&2; exit 1 ;; esac ;;
+	*) case "$ARCH" in *x8*)
+		echo "FATAL: profil '$PROFILE' neni x8, ale archiv ano:" >&2
+		echo "       $ARCH" >&2
+		echo "       Predej spravny archiv druhym argumentem." >&2; exit 1 ;; esac ;;
+esac
 
 echo ">>> archiv : $ARCH"
 
@@ -104,14 +126,39 @@ fi
 # (strongswan-*, switch, wifimngr, ...) a spadne po pulantre minute. Radeji to
 # rict hned a jmenem. Zmereno 5. 9. 2026 na prvnim IB, ktery jsme kdy postavili.
 _n=$(ls "$IBD"/packages/*.apk 2>/dev/null | wc -l)
+if [ "$_n" -lt 100 ] && [ -d "$ARCH/sdk/packages-apk" ]; then
+	# Tataz zaplata, jakou uz ma img-build.sh. Universal IB z 2026-09-05 14:42
+	# vznikl pred CONFIG_IB_STANDALONE=y a nese tri balicky; x8 IB z 16:45 uz
+	# je soberstacny. Bez teto vetve se rychla smycka na universalu nedala
+	# pouzit vubec - a projevovalo se to jako "no such package" u
+	# kmod-crypto-eip-*, tedy jako chybejici balicky.
+	echo ">>> IB mel jen $_n balicku, doplnuji z archivu"
+	cp -f "$ARCH"/sdk/packages-apk/*.apk "$IBD/packages/"
+	_n=$(ls "$IBD"/packages/*.apk | wc -l)
+	# Doplnit balicky NESTACI: nesoberstacny IB ma v `repositories` adresy na
+	# downloads.openwrt.org a apk si tam sahne pro novejsi verzi. Soberstacny
+	# ma ten soubor prazdny.
+	if [ -s "$IBD/repositories" ]; then
+		cp -f "$IBD/repositories" "$IBD/repositories.puvodni"
+		: > "$IBD/repositories"
+		echo ">>> odriznuty vzdalene repozitare"
+	fi
+fi
 if [ "$_n" -lt 100 ]; then
 	echo "STOP: tenhle ImageBuilder neni soberstacny - ma v sobe jen $_n balicku." >&2
-	echo "      Vznikl pred zapnutim CONFIG_IB_STANDALONE=y v builderu." >&2
+	echo "      Vznikl pred zapnutim CONFIG_IB_STANDALONE=y v builderu," >&2
+	echo "      a v archivu neni ani sdk/packages-apk/, odkud ho doplnit." >&2
 	echo "      Potrebuje jeden plny build; ten uz IB postavi spravne." >&2
 	exit 1
 fi
 
 # cerstve prelozene balicky maji prednost pred temi v IB
+# Sobestacny IB ma soubor `repositories` PRAZDNY. Kdyz uplne CHYBI, apk skonci
+# na "failed to read repositories" a hned za tim vysype seznam balicku, ktere
+# "neexistuji" - takze to vypada na chybejici balicky a je to prazdny soubor.
+# Zmereno 2026-09-06, stalo to ctvrt hodiny hledani ve spatnem miste.
+[ -e "$IBD/repositories" ] || { : > "$IBD/repositories"; echo ">>> chybel prazdny repositories, doplnen"; }
+
 cp -f "$SDKD"/bin/packages/*/easymeshr6/*.apk "$IBD/packages/" 2>/dev/null || true
 cp -f "$SDKD"/bin/packages/*/*/*.apk "$IBD/packages/" 2>/dev/null || true
 
@@ -145,3 +192,22 @@ echo
 echo ">>> HOTOVO:"
 ls -l "$IBD"/bin/targets/*/*/*.itb "$IBD"/bin/targets/*/*/*.img.gz 2>/dev/null \
 	| awk '{printf "    %6.1f MB  %s\n", $5/1048576, $9}'
+
+# img-overit.sh se diva VYHRADNE do ~/OBRAZY/<varianta>/, kam tenhle skript nic
+# neklade. Kdo pusti builder-fast.sh a hned po nem img-overit.sh, dostane
+# ZELENOU na uplne jiny obraz - ten, ktery tam nechal posledni img-*.sh nebo
+# daemon-fast.sh, treba i o hodinu starsi.
+#
+# Stalo se to 6. 9. 2026: img-overit hlasil 7 rozdilnych souboru a mezi nimi
+# CHYBEL names.sh, ktery se v tom buildu zmenil - protoze kontroloval obraz o
+# hodinu starsi. Nic v tom vypisu na to neupozornilo.
+#
+# Rozdil je vecny, ne nedopatreni: tenhle skript sklada obraz z ARCHIVNICH
+# balicku plus nasich sedmi, takze v nem NEJSOU zmeny demonu (mapagent,
+# mapcontroller) z daemon-fast.sh. Kopirovat ho do ~/OBRAZY by je proto tise
+# zahodilo. Kdyz jsou potreba obe veci naraz, patri nase .apk do
+# ~/img-work/<varianta>/*/packages/ a spusti se img-<varianta>.sh.
+_v=x8; case "$PROFILE" in *pro-8x*) _v=x8 ;; *) _v=universal ;; esac
+echo
+echo ">>> POZOR: img-overit.sh kontroluje ~/OBRAZY/$_v/ a tenhle obraz tam NENI."
+echo "    Bez toho ti overi cizi obraz a nic nerekne."

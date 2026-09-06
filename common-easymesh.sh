@@ -194,7 +194,11 @@ easymesh_install_mld_scripts() {
 	\cp "$E/usr-sbin/mesh-env" files/usr/sbin/mesh-env; chmod +x files/usr/sbin/mesh-env
 
 	\cp "$E/www-cgi/mesh-status" files/www/cgi-bin/mesh-status; chmod +x files/www/cgi-bin/mesh-status
-	\cp "$E/mesh-node-names"     files/etc/mesh-node-names
+
+	# /etc/mesh-node-names se ZAMERNE NEPECE. Byla tam zapecena kniha se tremi
+	# AL-MAC z doby pred efuse (86:f7:.., ca:8e:.., e6:a9:..) - adresy, ktere
+	# uz zadna krabice nema. Kniha jmen je zaznam o TOMHLE zeleze, ne soucast
+	# obrazu: controller si ji vede sam a agenti zadnou nemaji.
 
 	# Odstrani fantomove bsta sekce, ktere keep-config veze pres generace.
 	# Vznikaji tak, ze config_find_bsta_wireless() nekontroluje disabled, takze

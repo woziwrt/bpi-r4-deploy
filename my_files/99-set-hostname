@@ -1,27 +1,62 @@
 #!/bin/sh
 # /etc/uci-defaults/99-set-hostname
 #
-# Name the box after the medium it booted from - but only when it still
-# carries a default name. A node that was deliberately named (lab node,
-# mesh member) keeps its identity across a sysupgrade; overwriting it
+# Name the box after itself, not after the medium it booted from.
+#
+# The old default was BPI-R4-SD / -NVMe / -NAND / -eMMC, so every box off the
+# same medium shipped answering the same thing. Measured 2026-09-06 on the lab
+# mesh: four of five nodes all called themselves BPI-R4-SD, and the table could
+# only tell them apart by appending a piece of each AL-MAC. That is a defect
+# the owner receives in the box - they did nothing to earn it, and the first
+# thing they meet is a mesh where every node has the same name.
+#
+# So the default now carries the last six hex digits of the box's own AL-MAC,
+# which 30-set-ieee1905-al-macaddr derives from the SoC efuse (it runs first -
+# 30 sorts before 99). That value is burned at manufacture, so the name is the
+# same after every reflash and no two boxes can collide.
+#
+# It is still a FACTORY name, and names.sh:is_factory_name() recognises exactly
+# this form - six hex digits, nothing else. A box carrying it counts as unnamed,
+# so the mesh will hand back the name it had before it was reflashed, while
+# BPI-R4-kuchyn, which a person typed, is a real name and is never overwritten.
+#
+# Only a box that still carries a default name is touched. A node that was
+# deliberately named keeps its identity across a sysupgrade; overwriting it
 # silently breaks whatever addresses that name is tied to.
 
 cur="$(uci -q get system.@system[0].hostname)"
 case "$cur" in
     ""|OpenWrt|BPI-R4|BPI-R4-NVMe|BPI-R4-NAND|BPI-R4-eMMC|BPI-R4-SD) ;;
+    BPI-R4-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
     *) exit 0 ;;
 esac
 
-if [ -f /sys/firmware/devicetree/base/chosen/rootdisk-nvme ]; then
-    hostname="BPI-R4-NVMe"
-elif grep -q ubi /proc/cmdline; then
-    hostname="BPI-R4-NAND"
-elif [ -f /sys/firmware/devicetree/base/chosen/rootdisk-emmc ]; then
-    hostname="BPI-R4-eMMC"
-elif [ -f /sys/firmware/devicetree/base/chosen/rootdisk-sd ]; then
-    hostname="BPI-R4-SD"
-else
-    hostname="BPI-R4"
-fi
+al="$(uci -q get ieee1905.ieee1905.macaddress | tr -d ':' | tr 'A-Z' 'a-z')"
+
+case "$al" in
+[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f])
+    hostname="BPI-R4-$(echo "$al" | cut -c7-12)"
+    ;;
+*)
+    # No AL-MAC to name it after - the efuse read failed, or this ran before
+    # 30-set-ieee1905-al-macaddr for a reason we have not seen. Fall back to
+    # the old medium name rather than leaving the box called OpenWrt: a
+    # colliding name is bad, no name at all is worse.
+    if [ -f /sys/firmware/devicetree/base/chosen/rootdisk-nvme ]; then
+        hostname="BPI-R4-NVMe"
+    elif grep -q ubi /proc/cmdline; then
+        hostname="BPI-R4-NAND"
+    elif [ -f /sys/firmware/devicetree/base/chosen/rootdisk-emmc ]; then
+        hostname="BPI-R4-eMMC"
+    elif [ -f /sys/firmware/devicetree/base/chosen/rootdisk-sd ]; then
+        hostname="BPI-R4-SD"
+    else
+        hostname="BPI-R4"
+    fi
+    ;;
+esac
+
+[ "$cur" = "$hostname" ] && exit 0
+
 uci set system.@system[0].hostname="$hostname"
 uci commit system

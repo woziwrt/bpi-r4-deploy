@@ -29,7 +29,7 @@ easymesh_apply_wifi_patches() {
 	# BTWT: mac80211 he-btwt-supported + hostapd wpa_s btwt join.
 	# (x8 je NEMĚL — driver/hostapd divergence, root řady dnešních fantomů.)
 	\cp -r "$P/999-fix-01-mac80211-btwt-ap-mode.patch" \
-		"$MAC80211/package/kernel/mac80211/patches/subsys/0139-fix-mac80211-btwt-ap-mode-he-btwt-supported.patch"
+		"$MAC80211/package/kernel/mac80211/patches/subsys/0999-fix-mac80211-btwt-ap-mode-he-btwt-supported.patch"
 	\cp -r "$P/0264-wpa_s-add-btwt-join-command.patch" \
 		"$MAC80211/package/network/services/hostapd/patches/0264-wpa_s-add-btwt-join-command.patch"
 

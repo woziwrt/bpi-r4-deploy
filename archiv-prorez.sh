@@ -19,7 +19,12 @@ KEEP=2            # kolik nejnovejsich generaci KAZDE varianty zustane cele
 celkem=0
 for varianta in production production-x8; do
 	n=0
-	for d in $(ls -dt "$HOME"/archiv/*-"$varianta"/ 2>/dev/null); do
+	# POZOR: razeni podle JMENA, ne podle mtime (`ls -dt`). Jmeno obsahuje
+	# datum a cas buildu, takze je to pravda o poradi generaci. mtime lze
+	# zmenit pouhym sahnutim do adresare - 8. 9. 2026 se tim skript
+	# rozhodl prorezat CTYRI NEJNOVEJSI archivy a nechat prazdne starsi,
+	# protoze rucni uklid starych adresaru jim nastavil dnesni mtime.
+	for d in $(ls -d "$HOME"/archiv/*-"$varianta"/ 2>/dev/null | sort -r); do
 		# glob 'production' chytne i 'production-x8', vyfiltruj
 		[ "$varianta" = production ] && case "$d" in *-production-x8/) continue ;; esac
 		n=$((n + 1))

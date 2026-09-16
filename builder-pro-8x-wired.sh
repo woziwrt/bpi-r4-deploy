@@ -60,6 +60,11 @@ python3 -c 'f="target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"
 # BPI-R4-Pro-8x patches
 # Remove MTK feed patches superseded by our ports or already provided by feed
 rm -f target/linux/mediatek/patches-6.12/999-eth-06-mtk_eth_soc-support-ethernet-passive-mux.patch
+# VAZANO NA PIN: MediaTek si 2026-09-09 (e6696884c) pridal vlastni patch na tentyz SerDes
+# port1 mux, ktery vozime jako my_files/bpi-r4-pro/patches-kernel/999-dsa-07. Patche se
+# aplikuji podle ABECEDY, takze nas jde PRVNI a jejich 999-dsa-08 pak selze na uz zmenenem
+# souboru. Na pinech starsich nez 2026-09-09 tento radek nic nedela.
+rm -f target/linux/mediatek/patches-6.12/999-dsa-08-add-mxl862xx-serdes-port1-mux-selection.patch
 \cp -r ../my_files/bpi-r4-pro/patches-kernel/* target/linux/mediatek/patches-6.12/
 \cp ../my_files/bpi-r4-pro/patches-uboot/471-add-bpi-r4-pro-8x.patch package/boot/uboot-mediatek/patches/
 #\cp ../my_files/bpi-r4-pro/patches-uboot/472-add-bpi-r4-pro-8x-makefile.patch package/boot/uboot-mediatek/patches/

@@ -65,6 +65,11 @@ python3 -c 'f="target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"
 # Remove MTK feed patches superseded by our ports or already provided by feed
 rm -f target/linux/mediatek/patches-6.12/999-eth-06-mtk_eth_soc-support-ethernet-passive-mux.patch
 # Remove upstream Frank-W DTS patch — we use Sinovoip-based DTS instead
+# VAZANO NA PIN: MediaTek si 2026-09-09 (commit e6696884c) pridal vlastni patch na tentyz
+# SerDes port1 mux, ktery davno vozime jako my_files/bpi-r4-pro/patches-kernel/999-dsa-07.
+# Patche se aplikuji podle ABECEDY, takze nas 999-dsa-07 jde PRVNI a jejich 999-dsa-08 pak
+# nutne selze na uz zmenenem souboru. Na pinech starsich nez 2026-09-09 tento radek nic nedela.
+rm -f target/linux/mediatek/patches-6.12/999-dsa-08-add-mxl862xx-serdes-port1-mux-selection.patch
 rm -f target/linux/mediatek/patches-6.12/046-v6.19-arm64-dts-mediatek-mt7988a-bpi-r4-pro-add-dts.patch
 \cp -r ../my_files/bpi-r4-pro/patches-kernel/* target/linux/mediatek/patches-6.12/
 \cp ../my_files/bpi-r4-pro/patches-uboot/471-add-bpi-r4-pro-8x.patch package/boot/uboot-mediatek/patches/

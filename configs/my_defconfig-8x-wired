@@ -496,3 +496,9 @@ CONFIG_MEDIATEK_2P5GE_PHY=y
 CONFIG_GPIO_PCA953X=y
 CONFIG_GPIO_PCA953X_IRQ=y
 CONFIG_AS21XXX_PHY=m
+
+# 2026-09-16: dorovnani na produkcni sadu z VM1 (bez EasyMeshe).
+# ieee1905-topology-plugin se zamerne NEPRIDAVA - to je EasyMesh.
+CONFIG_PACKAGE_luci-app-tailscale-community=y
+CONFIG_PACKAGE_openssh-sftp-server=y
+CONFIG_PACKAGE_libnetfilter-conntrack=y

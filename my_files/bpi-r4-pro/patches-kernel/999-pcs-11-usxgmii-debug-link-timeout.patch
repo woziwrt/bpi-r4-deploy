@@ -1,0 +1,12 @@
+--- a/drivers/net/pcs/pcs-mtk-usxgmii.c
++++ b/drivers/net/pcs/pcs-mtk-usxgmii.c
+@@ -360,4 +360,8 @@
+ 	} while (time_before(jiffies, t_start + msecs_to_jiffies(10000)));
+ 
+-	dev_warn(mpcs->dev, "wait link up timeout!\n");
++	dev_warn(mpcs->dev,
++		 "wait link up timeout! link_status=%d valid_ctle=%d interface=%d\n",
++		 mtk_usxgmii_pcs_link_status(mpcs),
++		 mtk_usxgmii_pcs_is_valid_ctle(mpcs),
++		 interface);
+ }

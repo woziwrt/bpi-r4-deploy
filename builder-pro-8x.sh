@@ -5,21 +5,33 @@ set -euo pipefail
 #   OpenWrt:  6dead2869209f4ff9825f3169c129c5ef04f6273  (openwrt-25.12 HEAD, BEZE ZMENY)
 #   MTK SDK:  ec6b3fcef259708da3d7d2c189fa108c9bc67ac7  (MAIN HEAD; git01 mrazi -> MTK doporucil main)
 
+# BUMP 2026-09-16 (predchozi: OpenWrt 6dead28692 / MTK ec6b3fcef, oboje 5. 7.):
+#   OpenWrt:  9facdff6fb001b7a4e8cea395b89278fd49ca92f  (openwrt-25.12 HEAD, 15. 9.)
+#   MTK SDK:  e55f4f30d66b2a99c5a1b75bdc2f22bf6c756243  (github main, 16. 9.)
+#
+# Kernel jde .103 -> .108, oba piny MUSI jit spolu. Krome pinu se srovnava i sada
+# patchu s produkci: 046 s usxgmii (TX 1 G -> 9347 Mbit/s), 999-eth-01 s *dummy_dev
+# (stara verze se na .108 nechyti) a 999-sfp-11 uz nema starou kopii v patches-kernel,
+# ktera tu novou prepisovala.
+
 rm -rf openwrt
 rm -rf mtk-openwrt-feeds
 
 git clone --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt
-cd openwrt; git checkout ${OPENWRT_COMMIT:-6dead2869209f4ff9825f3169c129c5ef04f6273}; cd -;
+cd openwrt; git checkout ${OPENWRT_COMMIT:-9facdff6fb001b7a4e8cea395b89278fd49ca92f}; cd -;
 
 git clone --branch main https://github.com/mediatek/mtk-openwrt-feeds mtk-openwrt-feeds
-( cd mtk-openwrt-feeds && git checkout ${MTK_COMMIT:-ec6b3fcef259708da3d7d2c189fa108c9bc67ac7} )
+( cd mtk-openwrt-feeds && git checkout ${MTK_COMMIT:-e55f4f30d66b2a99c5a1b75bdc2f22bf6c756243} )
 
 \cp -r my_files/999-sfp-10-additional-quirks.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-sfp-11-rtl8261be-mdio-none.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-sfp-22-rtl8261be-boot-1g-reprobe.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-eth-21-mtk-gdm-rx-fsm-reset.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 #\cp -r my_files/999-sfp-15-oem-sfp10gt-ignore-los.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
-\cp -r my_files/999-fix-00-xfrm-sw-sa-offload-ok.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+# ODSTRANENO 2026-09-16: MediaTek tenhle patch od commitu 2b48bf00 (3. 9.) veze sam
+# jako 999-crypto-07-xfrm-backport-kernel-7.1-fix-return-value-for-async-algo.patch.
+# Ponechani naseho by patch aplikovalo DVAKRAT a build by spadl.
+#\cp -r my_files/999-fix-00-xfrm-sw-sa-offload-ok.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 
 ### tx_power check Ivan Mironov's patch - for defective BE14 boards with defective eeprom flash
 \cp -r my_files/100-wifi-mt76-mt7996-Use-tx_power-from-default-fw-if-EEP.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches

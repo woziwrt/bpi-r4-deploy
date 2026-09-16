@@ -510,3 +510,6 @@ CONFIG_GPIO_PCA953X_IRQ=y
 CONFIG_AS21XXX_PHY=m
 CONFIG_PACKAGE_kmod-macvlan=y
 CONFIG_PACKAGE_kmod-dummy=y
+
+# 2026-09-16: dorovnani na produkcni sadu z VM1 (bez EasyMeshe).
+CONFIG_PACKAGE_ luci-app-tailscale-community openssh-sftp-server libnetfilter-conntrack=y

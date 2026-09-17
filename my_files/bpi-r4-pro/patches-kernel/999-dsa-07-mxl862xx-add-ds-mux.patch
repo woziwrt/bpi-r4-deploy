@@ -1,3 +1,22 @@
+From: Petr Wozniak <petr.wozniak@gmail.com>
+Date: Thu, 4 Jun 2026 13:16:58 +0200
+Subject: [PATCH] net: dsa: mxl862xx: add passive mux selection for combo SFP/PHY
+
+Passive mux selection for the combo SFP/PHY on mxl862xx SerDes port1.
+The mux path follows the SFP cage: a module present selects the SFP
+channel, an empty cage falls back to the 10G PHY.
+
+Downstream patch for BPI-R4 Pro 8X. MediaTek carries the same code since
+2026-09-08 as 999-dsa-08 (neal.yen@mediatek.com); our builder removes
+theirs so it is not applied twice.
+
+Cleanup 2026-09-16, taken from their version: of_node_put(mux_np) belongs
+after the loop, not inside it - with more than one ds-mux node it would
+drop the reference once per iteration. The error path now releases the
+child and stops instead of carrying on. Our device tree declares a single
+ds-mux node, so neither bug can trigger as things stand; this is hygiene,
+not a fix for an observed fault.
+---
 --- a/drivers/net/dsa/mxl862xx/mxl862xx.h
 +++ b/drivers/net/dsa/mxl862xx/mxl862xx.h
 @@ -87,6 +87,23 @@
@@ -262,7 +281,7 @@
  	struct dsa_switch *ds;
  	int ret;
  
-@@ -3782,6 +3993,26 @@
+@@ -3782,6 +3993,28 @@
  		dev_info(dev, "%s:%u: Enable force isolate", __func__, __LINE__);
  	}
  
@@ -279,17 +298,19 @@
 +				continue;
 +
 +			ret = ds_add_mux(priv, child);
-+			if (ret)
++			if (ret) {
 +				dev_err(dev, "failed to add mux\n");
-+
-+			of_node_put(mux_np);
-+		};
++				of_node_put(child);
++				break;
++			}
++		}
++		of_node_put(mux_np);
 +	}
 +
  	return 0;
  }
  
-@@ -3789,6 +4020,7 @@
+@@ -3789,6 +4022,7 @@
  {
  	struct dsa_switch *ds = dev_get_drvdata(&mdiodev->dev);
  

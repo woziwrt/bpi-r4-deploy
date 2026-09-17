@@ -41,8 +41,25 @@ easymesh_require_clean_trees
 #
 # Oba piny jdou prebit z prostredi:
 #   MTK_COMMIT=<sha> OPENWRT_COMMIT=<sha> ./builder-x8-production.sh
-OPENWRT_COMMIT=${OPENWRT_COMMIT:-30d53697c798e61043da296681b9c219ef6b484b}
-MTK_COMMIT=${MTK_COMMIT:-6aeae9ebfba5b2dd815b1542992abd12db975f8d}
+# BUMP 2026-09-16 (predchozi: OpenWrt 30d53697c7 / MTK 4a54f5b760):
+#   OpenWrt:  9facdff6fb001b7a4e8cea395b89278fd49ca92f  (openwrt-25.12 HEAD, 15. 9.)
+#   MTK SDK:  e55f4f30d66b2a99c5a1b75bdc2f22bf6c756243  (github main, 16. 9. rano)
+#
+# POZOR, kernel se TENTOKRAT MENI: .103 -> .108 (bumpy 104/105/107/108 z 11. 9.).
+# Bump na .105 refreshoval radu mtk_eth_soc patchu v generic/pending-6.12 (dma ring
+# address, SerDes modes, rx ring size, page pool stats, EEE) - kontext se posunul
+# prave tam, kam sahaji MTK 999-eth-* i nas 999-eth-21. Kdyz build spadne, spadne
+# nejspis tam.
+#
+# Co novy MTK feed prinasi: 5e36cf002 opravuje 02_network pro bananapi,bpi-r4-pro-8x
+# (meli tam bpi-r4-pro), 930b6615f je ethswbox MR2 V1.4.0.0 pro mxl862xx,
+# caf382578 + 2782d291f + 6e7c32f3f + novy 999-eth-55 jsou eth fixy.
+#
+# STAV OVERENI: MTK e55f4f30 se starym kernelem .103 postaveno 16. 9. v 06:58 bez
+# jedine chyby patche. Kombinace s kernelem .108 se stavi timto pinem POPRVE a NA
+# ZELEZE NENI OVERENA - do uzivatelskych vetvi az po testu (Combo porty, AQR SFP).
+OPENWRT_COMMIT=${OPENWRT_COMMIT:-9facdff6fb001b7a4e8cea395b89278fd49ca92f}
+MTK_COMMIT=${MTK_COMMIT:-e55f4f30d66b2a99c5a1b75bdc2f22bf6c756243}
 
 rm -rf openwrt
 rm -rf mtk-openwrt-feeds
@@ -126,8 +143,13 @@ patch -p1 -d mtk-openwrt-feeds < my_files/999-vendor-01-amnt-macaddr-flat.patch
 #
 # VAZANO NA PIN: pri navratu na MTK pin starsi nez 6aeae9ebf musi tento radek zpet,
 # jinak v obrazu neni ANI JEDNA verze a panic pri vytazeni AQR113C SFP se vraci.
-\cp -r my_files/999-fix-01-mac80211-btwt-ap-mode.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mac80211/patches/subsys/0139-fix-mac80211-btwt-ap-mode-he-btwt-supported.patch
-\cp -r my_files/999-fix-00-xfrm-propagate-einprogress.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+\cp -r my_files/999-fix-01-mac80211-btwt-ap-mode.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mac80211/patches/subsys/0999-fix-mac80211-btwt-ap-mode-he-btwt-supported.patch
+# ODSTRANENO 8. 9. 2026: MediaTek tenhle patch PREVZAL do sveho feedu jako
+# 999-crypto-07-xfrm-backport-kernel-7.1-fix-return-value-for-async-algo.patch
+# (commit 2b48bf00, 3. 9.). Jejich verze obsahuje navic druhy commit
+# 'xfrm: fix stale skb->prev after async crypto steals a GSO segment'.
+# Ponechani naseho by patch aplikovalo DVAKRAT a build by spadl.
+#\cp -r my_files/999-fix-00-xfrm-propagate-einprogress.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/0264-wpa_s-add-btwt-join-command.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/network/services/hostapd/patches/0264-wpa_s-add-btwt-join-command.patch
 
 ### tx_power check Ivan Mironov's patch - for defective BE14 boards with defective eeprom flash
@@ -176,6 +198,20 @@ PLATFORM_EOF
 # Pro-8X specifické: odstranit superseded MTK feed patche, nasadit naše
 rm -f target/linux/mediatek/patches-6.12/999-eth-06-mtk_eth_soc-support-ethernet-passive-mux.patch
 rm -f target/linux/mediatek/patches-6.12/046-v6.19-arm64-dts-mediatek-mt7988a-bpi-r4-pro-add-dts.patch
+# PRIDANO 10. 9. 2026 s posunem pinu na 4a54f5b7 (bylo 6aeae9eb):
+# MTK pridal 8. 9. commitem e6696884 vlastni port TEHOZ Sinovoip 6.6 kodu, ktery uz
+# davno vozime jako my_files/bpi-r4-pro/patches-kernel/999-dsa-07-mxl862xx-add-ds-mux.patch.
+# Patche se aplikuji podle ABECEDY jmena souboru, takze nas 999-dsa-07-mxl862xx-* jde
+# PRVNI a jejich 999-dsa-08-* by tentyz kod aplikoval podruhe -> build spadne.
+# Nechavame nas: je odjety na zeleze, prepinani SFP klec <-> RJ45 funguje na MxL
+# i na Aeonsemi. Jejich verze neni horsi, jen neoverena (a nese preklep "requset").
+rm -f target/linux/mediatek/patches-6.12/999-dsa-08-add-mxl862xx-serdes-port1-mux-selection.patch
+# PREVENTIVNI, tyz commit 20fff972: MTK prepsal compatible sveho mt7988a-bananapi-bpi-r4-pro.dts
+# z "bananapi,bpi-r4-pro" na "bananapi,bpi-r4-pro-8x" - tedy na TENTYZ, jaky ma nas 046.
+# Dva DTS s jednim compatible je presne to, na cem stoji board detection ve fit.sh.
+# Build by nespadl (TARGET_DEVICES ma jen nas bpi-r4-pro-8x, nas DTS je samostatny
+# a jejich neincluduje), ale duplicitni identitu desky ve stromu nechceme.
+rm -f target/linux/mediatek/patches-6.12/999-dts-mt7988a-bananapi-bpi-r4-pro-01-arm64-dts-mediatek-add-bananapi-bpi-r4-pro-support.patch
 \cp -r ../my_files/bpi-r4-pro/patches-kernel/* target/linux/mediatek/patches-6.12/
 \cp ../my_files/bpi-r4-pro/patches-uboot/471-add-bpi-r4-pro-8x.patch package/boot/uboot-mediatek/patches/
 \cp ../my_files/bpi-r4-pro/uboot-mediatek-Makefile package/boot/uboot-mediatek/Makefile

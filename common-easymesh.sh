@@ -441,6 +441,7 @@ easymesh_archive_build() {
 #   predchozi pin f82f7370c: credentials come from whoever owns them -
 #   mapcontroller on a controller, mapagent ap sections on an agent
 #
+#   pin 979f8930e (17. 9.): backhaul steer for MLO bSTA (controller + agent, HW ok); predchozi 25c6bc0dd
 #   pin 25c6bc0dd (17. 9.): local AP MLDs adopt controller M2 credentials (#12 v4,
 #   HW: regrese na x8 + MTK controller bez rebootu); predchozi pin eee544d97
 #
@@ -463,7 +464,7 @@ easymesh_setup_iopsys_feed() {
 	#   odpovidajici tag, ten se odsud nepretahuje)
 	# Bez toho by `git reset --hard` nize kazdy takovy pokus prepsal zpatky
 	# na aktualni pin a build by tise vyrobil dnesek misto vcerejska.
-	local pin=${IOPSYS_PIN:-25c6bc0dd}
+	local pin=${IOPSYS_PIN:-979f8930e}
 	( cd "${EASYMESH_SHARED}/iopsys-feed" \
 	  && { git rev-parse --verify -q "${pin}^{commit}" >/dev/null 2>&1 || git fetch --all --tags; } \
 	  && git reset --hard "${pin}" && git clean -fd ) || {

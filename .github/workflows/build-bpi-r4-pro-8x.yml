@@ -1,13 +1,6 @@
 # Build base is defined in the builder scripts themselves (single source of truth):
-#   builder-pro-8x.sh / builder-pro-8x-wired.sh -> git clone --branch main + checkout MTK 822c2f06...
-#   OpenWrt: 6dead28... (openwrt-25.12 HEAD)  |  MTK SDK: 822c2f06... (main HEAD)
-# Migrated git01->main 2026-07-05; eMMC/NVMe autoexpand HW verified on Pro 8X 2026-07-06.
-# NOTE: this workflow no longer reads build-versions.env (that file drives the standard-R4
-#       deploy.yml only). Optional dispatch inputs openwrt_commit/mtk_commit override the builder.
-#
-# Previous bases:
-#   2026-06-16: 949487e0... / 3f8797ce... (6.12.92)
-#   ~2026-05:   13ff2256... / dceb45f8...
+#   builder-pro-8x.sh / builder-pro-8x-wired.sh -> OPENWRT_COMMIT / MTK_COMMIT defaults.
+# Optional dispatch inputs openwrt_commit/mtk_commit override them.
 
 name: Build BPI-R4 Pro 8X
 
@@ -27,11 +20,11 @@ on:
         required: false
         default: ''
       openwrt_commit:
-        description: 'OpenWrt commit hash (leave empty to use build-versions.env)'
+        description: 'OpenWrt commit hash (leave empty to use the builder default)'
         required: false
         default: ''
       mtk_commit:
-        description: 'MTK SDK commit hash (leave empty to use build-versions.env)'
+        description: 'MTK SDK commit hash (leave empty to use the builder default)'
         required: false
         default: ''
 

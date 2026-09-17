@@ -1,2 +1,0 @@
-iifname "br-*" oifname "eth1" accept comment "Docker containers to WAN"
-iifname "br-*" oifname "br-*" accept comment "Bridge inter-forward (LAN to Docker, Docker to LAN)"

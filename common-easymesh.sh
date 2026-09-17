@@ -441,6 +441,9 @@ easymesh_archive_build() {
 #   predchozi pin f82f7370c: credentials come from whoever owns them -
 #   mapcontroller on a controller, mapagent ap sections on an agent
 #
+#   pin 25c6bc0dd (17. 9.): local AP MLDs adopt controller M2 credentials (#12 v4,
+#   HW: regrese na x8 + MTK controller bez rebootu); predchozi pin eee544d97
+#
 # Pri obnove na cistem stroji klonovat odtud, ne z upstreamu - upstream nase
 # patche nema. Po zmene ve feedu: commit + `git push woziwrt devel` + posunout
 # pin nize, jinak `git reset --hard` v teto funkci tu zmenu pri buildu zahodi.
@@ -460,7 +463,7 @@ easymesh_setup_iopsys_feed() {
 	#   odpovidajici tag, ten se odsud nepretahuje)
 	# Bez toho by `git reset --hard` nize kazdy takovy pokus prepsal zpatky
 	# na aktualni pin a build by tise vyrobil dnesek misto vcerejska.
-	local pin=${IOPSYS_PIN:-eee544d97}
+	local pin=${IOPSYS_PIN:-25c6bc0dd}
 	( cd "${EASYMESH_SHARED}/iopsys-feed" \
 	  && { git rev-parse --verify -q "${pin}^{commit}" >/dev/null 2>&1 || git fetch --all --tags; } \
 	  && git reset --hard "${pin}" && git clean -fd ) || {

@@ -1,0 +1,136 @@
+wpa_supplicant.uc: apsta must not stop the APs of a mesh node
+
+MTK iface_hostapd_notify() sends apsta_state up:false for every radio of a
+station that is scanning/authenticating/disconnected, and hostapd stops all
+APs on those radios until some station reports COMPLETED. Per station, last
+notifier wins, and it races the AP start: on 2026-09-18 a test STA and a STA
+MLD left the 2.4 GHz fronthaul leg dead (reproduced with udebug, corridor).
+
+On a node with a Multi-AP backhaul station only the backhaul may stop the
+APs - it needs the radio free to join a parent on another channel, and its
+COMPLETED restarts them there. Other stations leave them alone. Elsewhere an
+AP is stopped only when no station on that radio is connected.
+
+--- a/wpa_supplicant.uc	2026-09-18 16:59:57.778857307 +0200
++++ b/wpa_supplicant.uc	2026-09-18 18:07:27.091294443 +0200
+@@ -19,6 +19,7 @@
+ wpas.data.iface_phy = {};
+ wpas.data.iface_ubus = {};
+ wpas.data.macaddr_list = {};
++wpas.data.sta_state = {};
+ 
+ function iface_stop(iface)
+ {
+@@ -652,8 +653,70 @@
+ 	ubus.call("service", "event", { type: `wpa_supplicant.${name}.${type}`, data: {} });
+ }
+ 
++// A station that is not connected stops every AP on its radios (apsta), so
++// the APs can come back on the channel the station finds. Two things in that
++// rule do not hold on a mesh node:
++//
++// - It is per station, and the last one to report wins. A second station on
++//   the same radio that scans (a test STA, a WPS round, anything) stopped the
++//   APs although the first one was connected, and they stayed down until some
++//   station reported COMPLETED again - on a radio with no connected station,
++//   never (2026-09-18: 2.4 GHz fronthaul leg dead while a STA MLD scanned).
++//   So an AP is stopped only when no station on that radio is connected.
++//
++// - On a mesh node (it has a Multi-AP backhaul station, multi_ap_backhaul_sta=1)
++//   only the backhaul decides. It still stops the APs while it looks for its
++//   parent: a radio holds one channel, and with the APs running on another
++//   one the backhaul could never join a parent that moved, never reach
++//   COMPLETED, and nothing would move the APs - a deadlock. Its COMPLETED
++//   restarts them on the parent's channel. Any other station on a mesh node
++//   (a test STA, a client uplink) leaves the APs alone: it raced the AP start,
++//   an AP that came up 5 ms before such a STA reported SCANNING stayed down,
++//   one that came up after it did not (2026-09-18, the same step failed in
++//   one run and passed in the other).
++function sta_is_mesh_backhaul(ifname)
++{
++	let conf = readfile(`/var/run/wpa-supplicant-${ifname}.conf`);
++	return conf != null && index(conf, "multi_ap_backhaul_sta=1") >= 0;
++}
++
++function node_is_mesh()
++{
++	for (let name in wpas.data.iface_phy)
++		if (sta_is_mesh_backhaul(name))
++			return true;
++	for (let name in wpas.data.mld)
++		if (sta_is_mesh_backhaul(name))
++			return true;
++	return false;
++}
++
++function radio_has_connected_sta(phy, skip)
++{
++	for (let name, state in wpas.data.sta_state) {
++		if (name == skip || state != "COMPLETED")
++			continue;
++
++		let mld = wpas.data.mld[name];
++		if (!mld) {
++			if (wpas.data.iface_phy[name] == phy)
++				return true;
++			continue;
++		}
++
++		let mask = mld.radio_mask;
++		for (let i = 0; mask; i++, mask >>= 1)
++			if ((mask & 1) && phy_name(mld.phy, i) == phy)
++				return true;
++	}
++
++	return false;
++}
++
+ function iface_hostapd_notify(ifname, iface, state)
+ {
++	wpas.data.sta_state[ifname] = state;
++
+ 	let status = iface.status();
+ 	let ubus = wpas.data.ubus;
+ 	let msg = {};
+@@ -685,12 +748,21 @@
+ 		return;
+ 	}
+ 
++	if (!msg.up && !sta_is_mesh_backhaul(ifname) && node_is_mesh()) {
++		wpas.printf(`${ifname}: ${state}, not the backhaul of a mesh node - APs keep running`);
++		return;
++	}
++
+ 	if (!mld) {
+ 		msg.phy = wpas.data.iface_phy[ifname];
+ 		if (!msg.phy) {
+ 			wpas.printf(`no PHY for ifname ${ifname}`);
+ 			return;
+ 		}
++		if (!msg.up && radio_has_connected_sta(msg.phy, ifname)) {
++			wpas.printf(`${ifname}: ${state}, ${msg.phy} has a connected station - APs keep running`);
++			return;
++		}
+ 		ubus.call("hostapd", "apsta_state", msg);
+ 		return;
+ 	}
+@@ -711,6 +783,11 @@
+ 		if (state == "COMPLETED")
+ 			iface_status_fill_radio(mld, i, radio_msg, status);
+ 
++		if (!msg.up && radio_has_connected_sta(phy_name(mld.phy, i), ifname)) {
++			wpas.printf(`${ifname}: ${state}, radio ${i} has a connected station - APs keep running`);
++			continue;
++		}
++
+ 		ubus.call("hostapd", "apsta_state", radio_msg);
+ 	}
+ }
+@@ -844,6 +921,7 @@
+ 		iface_event("add", name);
+ 	},
+ 	iface_remove: function(name, obj) {
++		delete wpas.data.sta_state[name];
+ 		iface_event("remove", name);
+ 		iface_ubus_remove(name);
+ 	},

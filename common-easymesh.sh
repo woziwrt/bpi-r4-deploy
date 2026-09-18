@@ -76,6 +76,34 @@ easymesh_apply_wifi_patches() {
 	\cp -r "$P/0269-ttlm-ctrl-iface-parser-fixes.patch" \
 		"$MAC80211/package/network/services/hostapd/patches/0269-ttlm-ctrl-iface-parser-fixes.patch"
 
+	# apsta: a station that is not connected made hostapd stop every AP on its
+	# radios, last notifier winning, racing the AP start - a test STA or a STA
+	# MLD left the 2.4 GHz fronthaul leg dead after `wifi` (2026-09-18, caught
+	# with udebug on corridor). On a node with a Multi-AP backhaul station only
+	# the backhaul may stop them (it needs the radio free to join a parent on
+	# another channel, and restarts them there); other stations leave them
+	# alone. The file is MTK's overlay of package/network/services/hostapd/files,
+	# so it is patched here.
+	patch -p1 -N -d "$MAC80211/package/network/services/hostapd/files" \
+		< "$P/0270-wpa_supplicant-apsta-keep-aps-on-mesh-node.patch" ||
+		{ echo "FATAL: 0270 apsta patch does not apply" >&2; return 1; }
+
+	# Restarting ONE radio broke every AP MLD it shares with the other radios
+	# (mac80211 MBSSID stop + hostapd freeing the MLD drv state + a restart
+	# path that only brings back that radio). hostapd.uc now restarts the
+	# other radios of those MLDs together, 3 s later. 2026-09-18, corridor:
+	# radio0/1/2 alone all went from broken links to 3/3 + 2/2.
+	patch -p1 -N -d "$MAC80211/package/network/services/hostapd/files" \
+		< "$P/0271-hostapd-restart-mld-sibling-radios.patch" ||
+		{ echo "FATAL: 0271 MLD sibling restart patch does not apply" >&2; return 1; }
+
+	# hostapd sent ctrl_iface replies with a blocking sendto(); a client that
+	# stopped reading (wifimngr, events filled its buffer) froze the whole
+	# hostapd in sock_alloc_send_pskb - x8, 2026-09-18, ~3 min, a mesh child
+	# could not authenticate. Replies now go out with MSG_DONTWAIT.
+	\cp -r "$P/0272-ctrl-iface-replies-must-not-block.patch" \
+		"$MAC80211/package/network/services/hostapd/patches/0272-ctrl-iface-replies-must-not-block.patch"
+
 	# per-band WiFi LED (MT7996 single-wiphy MLO) + shared tpt trigger.
 	\cp -r "$P/999-wifi-01-mt7996-per-band-leds.patch" \
 		"$MAC80211/package/kernel/mt76/patches/9999-w-mt7996-per-band-leds.patch"
@@ -512,6 +540,14 @@ CONFIG_PACKAGE_wpad-openssl=y
 CONFIG_PACKAGE_hostapd-common=y
 CONFIG_PACKAGE_hostapd-utils=y
 CONFIG_PACKAGE_wpa-cli=y
+# udebug: ring buffers of hostapd/wpa_supplicant nl80211 + log, netifd, procd
+# and kernel log on one timeline (`udebug -o x.pcapng snapshot`), off until
+# enabled in /etc/config/udebug. The tool that found the apsta race
+# (2026-09-18). netsys_dbg_util: MTK register dump of the ethernet/WED path.
+CONFIG_PACKAGE_udebugd=y
+CONFIG_PACKAGE_udebug-cli=y
+CONFIG_PACKAGE_ucode-mod-udebug=y
+CONFIG_PACKAGE_netsys_dbg_util=y
 CONFIG_AGENT_EASYMESH_VERSION=6
 CONFIG_CONTROLLER_EASYMESH_VERSION=6
 CONFIG_MULTIAP_EASYMESH_VERSION=6

@@ -1,0 +1,68 @@
+hostapd: ctrl_iface replies must not block
+
+Events to attached monitors go out with MSG_DONTWAIT, but replies to
+requests use a blocking sendto(). A client that uses one socket for both
+(libwifi/wifimngr on every MLD link socket) and stops reading for a while
+fills its receive buffer with events; the reply to its next request then
+blocks hostapd in sock_alloc_send_pskb until the client reads again. All
+APs and links of that hostapd stop serving meanwhile: on 2026-09-18 x8
+hostapd hung ~3 min (ubus silent, a mesh child could not authenticate).
+Send replies with MSG_DONTWAIT too; a client that is not reading loses
+the reply and times out instead of freezing the AP.
+
+--- a/hostapd/ctrl_iface.c	2026-09-18 19:36:50.168117011 +0200
++++ b/hostapd/ctrl_iface.c	2026-09-18 19:36:50.172311015 +0200
+@@ -7396,7 +7396,7 @@
+ 
+ 	reply = os_malloc(reply_size);
+ 	if (reply == NULL) {
+-		if (sendto(sock, "FAIL\n", 5, 0, (struct sockaddr *) &from,
++		if (sendto(sock, "FAIL\n", 5, MSG_DONTWAIT, (struct sockaddr *) &from,
+ 			   fromlen) < 0) {
+ 			wpa_printf(MSG_DEBUG, "CTRL: sendto failed: %s",
+ 				   strerror(errno));
+@@ -7446,7 +7446,7 @@
+ #ifdef CONFIG_CTRL_IFACE_UDP
+ done:
+ #endif /* CONFIG_CTRL_IFACE_UDP */
+-	if (sendto(sock, reply, reply_len, 0, (struct sockaddr *) &from,
++	if (sendto(sock, reply, reply_len, MSG_DONTWAIT, (struct sockaddr *) &from,
+ 		   fromlen) < 0) {
+ 		wpa_printf(MSG_DEBUG, "CTRL: sendto failed: %s",
+ 			   strerror(errno));
+@@ -7572,7 +7572,7 @@
+ 
+ 	reply = os_malloc(reply_size);
+ 	if (!reply) {
+-		if (sendto(sock, "FAIL\n", 5, 0, (struct sockaddr *) &from,
++		if (sendto(sock, "FAIL\n", 5, MSG_DONTWAIT, (struct sockaddr *) &from,
+ 			   fromlen) < 0) {
+ 			wpa_printf(MSG_DEBUG, "MLD CTRL: sendto failed: %s",
+ 				   strerror(errno));
+@@ -7589,7 +7589,7 @@
+ 							   reply, reply_size,
+ 							   &from, fromlen);
+ 
+-	if (sendto(sock, reply, reply_len, 0, (struct sockaddr *) &from,
++	if (sendto(sock, reply, reply_len, MSG_DONTWAIT, (struct sockaddr *) &from,
+ 		   fromlen) < 0) {
+ 		wpa_printf(MSG_DEBUG, "MLD CTRL: sendto failed: %s",
+ 			   strerror(errno));
+@@ -8505,7 +8505,7 @@
+ 
+ 	reply = os_malloc(reply_size);
+ 	if (reply == NULL) {
+-		if (sendto(sock, "FAIL\n", 5, 0, (struct sockaddr *) &from,
++		if (sendto(sock, "FAIL\n", 5, MSG_DONTWAIT, (struct sockaddr *) &from,
+ 			   fromlen) < 0) {
+ 			wpa_printf(MSG_DEBUG, "CTRL: sendto failed: %s",
+ 				   strerror(errno));
+@@ -8635,7 +8635,7 @@
+ 		reply_len = 5;
+ 	}
+ 
+-	if (sendto(sock, reply, reply_len, 0, (struct sockaddr *) &from,
++	if (sendto(sock, reply, reply_len, MSG_DONTWAIT, (struct sockaddr *) &from,
+ 		   fromlen) < 0) {
+ 		wpa_printf(MSG_DEBUG, "CTRL: sendto failed: %s",
+ 			   strerror(errno));

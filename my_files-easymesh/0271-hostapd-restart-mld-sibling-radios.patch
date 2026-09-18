@@ -1,0 +1,143 @@
+hostapd.uc: restart every radio of an MLD when one of them restarts
+
+Restarting one radio breaks every AP MLD it shares with the other radios,
+and nothing brings them back. Measured on BPI-R4/MT7996 with udebug,
+2026-09-18, every time: radio0 alone -> ap-mld-2 (no BSS on radio0) lost
+both links; radio1 or radio2 alone -> ap-mld-1 and ap-mld-2 left with one
+link each. A full `wifi` always recovers.
+
+Three layers: mac80211 stops every non-transmitting MBSSID member with all
+its MLD links when the transmitting BSS stops; hostapd frees the driver
+state the other links of an MLD still point at when the link that created
+the netdev goes; and the restart path only brings back the restarted radio.
+
+When a radio that was running with MLD links stops or changes, the other
+running radios of those MLDs are restarted too after 3 s - all taken down
+first, then brought up. During a full `wifi` they are torn down by netifd
+within that time and skipped. With this, single-radio restarts keep 3/3 and
+2/2 links on all three radios.
+
+--- a/hostapd.uc	2026-09-18 18:37:55.765435795 +0200
++++ b/hostapd.uc	2026-09-18 18:37:55.833334877 +0200
+@@ -1,5 +1,6 @@
+ let libubus = require("ubus");
+ import { open, readfile, access } from "fs";
++import * as uloop from "uloop";
+ import { wdev_remove, is_equal, vlist_new, phy_is_fullmac, phy_open, wdev_set_radio_mask, wdev_set_up } from "common";
+ 
+ let ubus = libubus.connect(null, 60);
+@@ -1177,6 +1178,102 @@
+ 		mld_reload_interface(name);
+ }
+ 
++// Restarting one radio breaks every AP MLD it shares with the other radios,
++// and nothing brings those back (measured 2026-09-18, corridor, every time):
++// radio0 alone -> ap-mld-2 (no BSS on radio0) lost both links; radio1 or
++// radio2 alone -> ap-mld-1 and ap-mld-2 left with one link each. Three
++// layers do it: mac80211 stops every non-transmitting MBSSID member with all
++// its MLD links when the transmitting BSS stops (ieee80211_stop_mbssid);
++// hostapd frees the drv state the other links of an MLD still point at when
++// the link that created the netdev goes; and the restart path here only
++// brings back the radio that was restarted. A full `wifi` restarts every
++// radio together and always recovers.
++//
++// So when a radio that was running with MLD links stops or changes, the
++// other running radios of those MLDs get a full restart too - all of them
++// taken down first, then brought up, since restarting them one by one hits
++// the same fault again. It waits 3 s: during a full `wifi` those radios are
++// torn down by netifd within that time and are skipped.
++hostapd.data.mld_sibling_pending = {};
++
++function config_mld_names(config)
++{
++	let names = {};
++	let list = config ? (config.orig_bss ?? config.bss) : null;
++	for (let bss in (list ?? []))
++		if (bss && bss.mld_ap && bss.ifname)
++			names[bss.ifname] = true;
++	return names;
++}
++
++function mld_sibling_restart_run()
++{
++	let pending = hostapd.data.mld_sibling_pending;
++	hostapd.data.mld_sibling_pending = {};
++	delete hostapd.data.mld_sibling_timer;
++
++	let run = {};
++	for (let name in pending) {
++		let config = hostapd.data.config[name];
++		if (!config || !config.orig_bss || !length(config.orig_bss))
++			continue;
++		run[name] = config;
++	}
++	if (!length(run))
++		return;
++
++	hostapd.printf(`MLD: restarting ${keys(run)} together, a radio sharing their MLD was restarted`);
++	for (let name, config in run) {
++		hostapd.remove_iface(name);
++		iface_remove(config);
++	}
++
++	for (let name, config in run) {
++		let phydev = phy_open(config.phy, config.radio_idx);
++		if (!phydev) {
++			hostapd.printf(`MLD: failed to open phy for ${name}`);
++			continue;
++		}
++
++		let cfg = { ...config, bss: [ ...config.orig_bss ] };
++		cfg.orig_bss = [ ...cfg.bss ];
++		hostapd.data.config[name] = cfg;
++		iface_check_mld(phydev, name, cfg);
++		if (length(cfg.bss))
++			iface_restart(phydev, cfg, config);
++	}
++}
++
++function mld_sibling_restart(name, old_config, config)
++{
++	if (!old_config || !old_config.bss || !length(old_config.bss))
++		return;
++
++	let old_mlds = config_mld_names(old_config);
++	if (!length(old_mlds))
++		return;
++
++	if (config && is_equal(old_config.radio, config.radio) &&
++	    is_equal(old_config.orig_bss, config.orig_bss))
++		return;
++
++	for (let other, cfg in hostapd.data.config) {
++		if (other == name || !cfg || !cfg.bss || !length(cfg.bss))
++			continue;
++		for (let mld in config_mld_names(cfg)) {
++			if (!old_mlds[mld])
++				continue;
++			hostapd.data.mld_sibling_pending[other] = true;
++			break;
++		}
++	}
++
++	if (!length(hostapd.data.mld_sibling_pending) || hostapd.data.mld_sibling_timer)
++		return;
++
++	hostapd.data.mld_sibling_timer = uloop.timer(3000, mld_sibling_restart_run);
++}
++
+ let main_obj = {
+ 	reload: {
+ 		args: {
+@@ -1359,9 +1456,11 @@
+ 			}
+ 
+ 			let config = iface_load_config(phy, radio, file);
++			let old_config = hostapd.data.config[name];
+ 
+ 			hostapd.printf(`Set new config for phy ${name}: ${file}`);
+ 			iface_set_config(name, config);
++			mld_sibling_restart(name, old_config, config);
+ 
+ 			if (hostapd.data.auth_obj)
+ 				hostapd.data.auth_obj.notify("reload", { phy, radio });

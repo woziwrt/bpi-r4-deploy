@@ -502,3 +502,4 @@ CONFIG_AS21XXX_PHY=m
 CONFIG_PACKAGE_luci-app-tailscale-community=y
 CONFIG_PACKAGE_openssh-sftp-server=y
 CONFIG_PACKAGE_libnetfilter-conntrack=y
+CONFIG_PACKAGE_kmod-nft-compat=y

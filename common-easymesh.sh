@@ -493,7 +493,7 @@ easymesh_setup_iopsys_feed() {
 	#   odpovidajici tag, ten se odsud nepretahuje)
 	# Bez toho by `git reset --hard` nize kazdy takovy pokus prepsal zpatky
 	# na aktualni pin a build by tise vyrobil dnesek misto vcerejska.
-	local pin=${IOPSYS_PIN:-ee9171910}
+	local pin=${IOPSYS_PIN:-fe994e117}
 	( cd "${EASYMESH_SHARED}/iopsys-feed" \
 	  && { git rev-parse --verify -q "${pin}^{commit}" >/dev/null 2>&1 || git fetch --all --tags; } \
 	  && git reset --hard "${pin}" && git clean -fd ) || {
@@ -548,6 +548,19 @@ CONFIG_PACKAGE_udebugd=y
 CONFIG_PACKAGE_udebug-cli=y
 CONFIG_PACKAGE_ucode-mod-udebug=y
 CONFIG_PACKAGE_netsys_dbg_util=y
+# Kernel tracing (2026-09-19): the join-without-reboot work traced a wrong
+# 6 GHz BSS entry (transmitted BSSID with the nontransmitted profile) to the
+# station's own RX path, below wpa_supplicant and above the air (pcap clean).
+# Seeing the frame as it reaches cfg80211 needs ftrace + the mac80211/cfg80211
+# tracepoints; kprobe events put probes on any function without a rebuild.
+# Dynamic ftrace costs nothing while no tracer is on.
+CONFIG_KERNEL_FTRACE=y
+CONFIG_KERNEL_ENABLE_DEFAULT_TRACERS=y
+CONFIG_KERNEL_FUNCTION_TRACER=y
+CONFIG_KERNEL_DYNAMIC_FTRACE=y
+CONFIG_KERNEL_KPROBES=y
+CONFIG_KERNEL_KPROBE_EVENTS=y
+CONFIG_PACKAGE_MAC80211_TRACING=y
 CONFIG_AGENT_EASYMESH_VERSION=6
 CONFIG_CONTROLLER_EASYMESH_VERSION=6
 CONFIG_MULTIAP_EASYMESH_VERSION=6

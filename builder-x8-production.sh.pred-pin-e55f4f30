@@ -41,25 +41,8 @@ easymesh_require_clean_trees
 #
 # Oba piny jdou prebit z prostredi:
 #   MTK_COMMIT=<sha> OPENWRT_COMMIT=<sha> ./builder-x8-production.sh
-# BUMP 2026-09-16 (predchozi: OpenWrt 30d53697c7 / MTK 4a54f5b760):
-#   OpenWrt:  9facdff6fb001b7a4e8cea395b89278fd49ca92f  (openwrt-25.12 HEAD, 15. 9.)
-#   MTK SDK:  e55f4f30d66b2a99c5a1b75bdc2f22bf6c756243  (github main, 16. 9. rano)
-#
-# POZOR, kernel se TENTOKRAT MENI: .103 -> .108 (bumpy 104/105/107/108 z 11. 9.).
-# Bump na .105 refreshoval radu mtk_eth_soc patchu v generic/pending-6.12 (dma ring
-# address, SerDes modes, rx ring size, page pool stats, EEE) - kontext se posunul
-# prave tam, kam sahaji MTK 999-eth-* i nas 999-eth-21. Kdyz build spadne, spadne
-# nejspis tam.
-#
-# Co novy MTK feed prinasi: 5e36cf002 opravuje 02_network pro bananapi,bpi-r4-pro-8x
-# (meli tam bpi-r4-pro), 930b6615f je ethswbox MR2 V1.4.0.0 pro mxl862xx,
-# caf382578 + 2782d291f + 6e7c32f3f + novy 999-eth-55 jsou eth fixy.
-#
-# STAV OVERENI: MTK e55f4f30 se starym kernelem .103 postaveno 16. 9. v 06:58 bez
-# jedine chyby patche. Kombinace s kernelem .108 se stavi timto pinem POPRVE a NA
-# ZELEZE NENI OVERENA - do uzivatelskych vetvi az po testu (Combo porty, AQR SFP).
-OPENWRT_COMMIT=${OPENWRT_COMMIT:-9facdff6fb001b7a4e8cea395b89278fd49ca92f}
-MTK_COMMIT=${MTK_COMMIT:-e55f4f30d66b2a99c5a1b75bdc2f22bf6c756243}
+OPENWRT_COMMIT=${OPENWRT_COMMIT:-30d53697c798e61043da296681b9c219ef6b484b}
+MTK_COMMIT=${MTK_COMMIT:-4a54f5b760d19c8a59f263ed33e398747a725ea7}
 
 rm -rf openwrt
 rm -rf mtk-openwrt-feeds
@@ -135,6 +118,7 @@ patch -p1 -d mtk-openwrt-feeds < my_files/999-vendor-01-amnt-macaddr-flat.patch
 \cp -r my_files/999-sfp-22-rtl8261be-boot-1g-reprobe.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-eth-21-mtk-gdm-rx-fsm-reset.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-pcs-10-lynxi-hold-link-down-on-invalid-speed.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+# 999-ephy-zz-01-fix-aqr-mib-thread-lifetime.patch se uz nekopiruje.
 #
 # MTK ho prevzal 2026-09-02 jako fc14f9a a je od pinu 6aeae9ebf primo v jejich
 # 999-ephy-aqr113c-04-add-mib-debugfs.patch, s ctyrmi opravami navic: priv->mib_lock,
@@ -142,15 +126,21 @@ patch -p1 -d mtk-openwrt-feeds < my_files/999-vendor-01-amnt-macaddr-flat.patch
 #
 # VAZANO NA PIN: pri navratu na MTK pin starsi nez 6aeae9ebf musi tento radek zpet,
 # jinak v obrazu neni ANI JEDNA verze a panic pri vytazeni AQR113C SFP se vraci.
+\cp -r my_files/999-fix-01-mac80211-btwt-ap-mode.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mac80211/patches/subsys/0999-fix-mac80211-btwt-ap-mode-he-btwt-supported.patch
 # ODSTRANENO 8. 9. 2026: MediaTek tenhle patch PREVZAL do sveho feedu jako
 # 999-crypto-07-xfrm-backport-kernel-7.1-fix-return-value-for-async-algo.patch
 # (commit 2b48bf00, 3. 9.). Jejich verze obsahuje navic druhy commit
 # 'xfrm: fix stale skb->prev after async crypto steals a GSO segment'.
 # Ponechani naseho by patch aplikovalo DVAKRAT a build by spadl.
+#\cp -r my_files/999-fix-00-xfrm-propagate-einprogress.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+\cp -r my_files/0264-wpa_s-add-btwt-join-command.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/network/services/hostapd/patches/0264-wpa_s-add-btwt-join-command.patch
 
 ### tx_power check Ivan Mironov's patch - for defective BE14 boards with defective eeprom flash
+#\cp -r my_files/100-wifi-mt76-mt7996-Use-tx_power-from-default-fw-if-EEP.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches
 
 ### per-band WiFi LED (MT7996, single-wiphy MLO) + shared tpt trigger - HW verified 2026-06-28
+\cp -r my_files/999-wifi-01-mt7996-per-band-leds.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches/9999-w-mt7996-per-band-leds.patch
+\cp -r my_files/999-wifi-02-mt76-share-tpt-led-trigger.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches/9999-w-mt76-share-tpt-led-trigger.patch
 
 
 ### mt76-vendor: MTK feed ships cmake_minimum_required(VERSION 2.8); host CMake 4.x

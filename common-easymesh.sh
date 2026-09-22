@@ -117,6 +117,30 @@ easymesh_apply_wifi_patches() {
 # --- 2) mld-*-check watchdogy + mesh helpers do image files/ ----------------
 # Voláno z openwrt/ (kde je files/). Identické na všech uzlech.
 easymesh_install_mld_scripts() {
+	# ZNESKODNENO 22. 9. 2026. Tuhle funkci uz nevola ani jeden builder
+	# (universal ji prestal volat 9. 8. 2026, x8 ma na tom miste
+	# "ZAMERNE NEVOLANO"). Runtime skripty dodava balicek easymesh-wifi
+	# z easymesh-r6-feed a zadny jiny zdroj pro ne neexistuje.
+	#
+	# Proc to nestaci nechat zakomentovane u volani: tady se z
+	# my_files-easymesh/etc-files/ pecou soubory se STEJNYMI jmeny, jaka dodava
+	# balicek - 18 dvojic, a VSECH 18 se md5 lisi (overeno 22. 9. na VM1:
+	# evsrc-check, wifi-evmap, wnm-enable, mld-link-check, mld-config-check,
+	# mld-report-check, node-heartbeat, mld-bsta-relink, mesh-gwd,
+	# mlo-backhaul-setup + 8 init.d skriptu). ImageBuilder aplikuje `FILES=`
+	# overlay AZ PO balickach, takze kdo tuhle funkci znovu zapne, tise prebije
+	# 18 zivych skriptu verzemi z 9. 8. - a na obrazu to nepozna nikdo.
+	#
+	# Kdyby se overlay nekdy vracel, neni to uklid, ale rozhodnuti: cisla
+	# uci-defaults se v obou sadach lisi (93-easymesh-mld-backhaul zde vs
+	# 90-easymesh-mld-backhaul ve feedu, 91-mlo-steerd-off vs 95-…,
+	# 98-mesh-dhcp-safe vs 995-…), takze by bezelo OBOJI a v jinem poradi vuci
+	# 991-multiap-genconfig.
+	echo "easymesh_install_mld_scripts: ZNESKODNENO 22. 9. 2026 - runtime skripty" >&2
+	echo "  dodava balicek easymesh-wifi. Volani teto funkce je chyba, viz komentar." >&2
+	return 1
+
+	# shellcheck disable=SC2317  # mrtve telo, ponechano jako zaznam co delalo
 	local E="${EASYMESH_SHARED}/my_files-easymesh/etc-files"
 	mkdir -p files/usr/sbin files/etc/init.d files/etc/rc.d files/www/cgi-bin
 

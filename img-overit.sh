@@ -31,6 +31,34 @@ ZIB="$HOME/OBRAZY/$VARIANT/openwrt-mediatek-filogic-$PROFILE-squashfs-sysupgrade
 [ -f "$PLNY" ] || { echo "STOP: chybi obraz z plneho buildu: $PLNY" >&2; exit 1; }
 [ -f "$ZIB" ]  || { echo "STOP: chybi obraz z IB: $ZIB   (spust nejdriv img-$VARIANT.sh)" >&2; exit 1; }
 
+# Kdo ten obraz slozil? Bez razitka to nevime a overovat ho nema smysl.
+PUV="$HOME/OBRAZY/$VARIANT/PUVOD.txt"
+[ -s "$PUV" ] || {
+	echo "STOP: $PUV chybi - nevim, kdo obraz v ~/OBRAZY/$VARIANT/ slozil." >&2
+	echo "      Slozit ho znovu pres img-$VARIANT.sh (ten razitko pise)." >&2
+	exit 1
+}
+[ "$PUV" -nt "$ZIB" ] || [ ! "$ZIB" -nt "$PUV" ] || {
+	echo "STOP: obraz je novejsi nez jeho razitko - nekdo ho vymenil mimo img-build.sh." >&2
+	echo "      obraz : $(ls -l "$ZIB" | awk '{print $6, $7, $8}')" >&2
+	echo "      razitko: $(ls -l "$PUV" | awk '{print $6, $7, $8}')" >&2
+	exit 1
+}
+
+# builder-fast.sh sklada do ~/fast-work/<profil>/ a SEM nic nedava - zamerne,
+# protoze v jeho obrazu nejsou zmeny demonu z daemon-fast.sh. Kdyz tam ale lezi
+# NOVEJSI obraz nez tady, skoro jiste se meri to spatne: nekdo pustil rychlou
+# smycku a hned za ni tenhle skript.
+_fw=$(ls -t "$HOME"/fast-work/*/openwrt-imagebuilder-*/bin/targets/*/*/*"$PROFILE"-squashfs-sysupgrade.itb 2>/dev/null | head -1)
+if [ -n "$_fw" ] && [ "$_fw" -nt "$ZIB" ]; then
+	echo "STOP: v ~/fast-work lezi NOVEJSI obraz teze varianty nez ten v ~/OBRAZY." >&2
+	echo "      fast-work: $_fw" >&2
+	echo "      OBRAZY   : $ZIB" >&2
+	echo "      Overoval bys starsi obraz a nic by to nereklo (stalo se 6. 9. 2026)." >&2
+	exit 1
+fi
+echo ">>> puvod obrazu:"; sed 's/^/    /' "$PUV"
+
 echo ">>> varianta: $VARIANT"
 echo "    plny build: $PLNY"
 echo "    z IB      : $ZIB"

@@ -55,16 +55,33 @@ echo ">>> archiv : $ARCH"
 # posunul OpenWrt nebo MTK pin, prelozilo by se to proti jinemu zakladu, nez do
 # ktereho to pak nasadime - a poznalo by se to az na zeleze. Radeji odmitnout.
 recipe() { sed -n "s/^  $1  *\([0-9a-f]\{7,\}\).*/\1/p" "$ARCH/MANIFEST.txt" | head -1; }
-for b in "$HOME"/universal-new/builder-production-universal.sh "$HOME"/x8-new/builder-x8-production.sh; do
-	[ -f "$b" ] || continue
-	_ow=$(sed -n 's/^OPENWRT_COMMIT=${OPENWRT_COMMIT:-\([0-9a-f]*\)}.*/\1/p' "$b" | head -1)
-	_mt=$(sed -n 's/^MTK_COMMIT=${MTK_COMMIT:-\([0-9a-f]*\)}.*/\1/p' "$b" | head -1)
-	break
-done
+
+# Pin se cte z GITu build stromu, ne ze zdrojaku builderu.
+#
+# Do 22. 9. se sem sedem tahalo OPENWRT_COMMIT= a MTK_COMMIT= z builder skriptu.
+# To je zapis toho, co si builder PREJE, ne toho, co ve strome LEZI - kdo udela
+# `git -C ~/x8-new/mtk-openwrt-feeds checkout <jine>` bez upravy skriptu, posune
+# zaklad a pojistka o tom nevi. Pravda je git stromu, ze ktereho se stavi.
+#
+# A vybira se strom podle PROFILU. Puvodni smycka mela na konci bezpodminecny
+# `break`, takze se cetl vzdycky jen universal builder a piny x8 se NIKDY
+# nepodivaly - pro pro-8x profil se porovnavalo proti cizimu stromu.
+case "$PROFILE" in *pro-8x*) PINTREE="$HOME/x8-new" ;; *) PINTREE="$HOME/universal-new" ;; esac
+_ow=""; _mt=""
+[ -d "$PINTREE/openwrt/.git" ]           && _ow=$(git -C "$PINTREE/openwrt"           rev-parse HEAD 2>/dev/null || true)
+[ -d "$PINTREE/mtk-openwrt-feeds/.git" ] && _mt=$(git -C "$PINTREE/mtk-openwrt-feeds" rev-parse HEAD 2>/dev/null || true)
+echo ">>> pin ze stromu: $PINTREE"
+
 _row=$(recipe openwrt); _rmt=$(recipe mtk-openwrt-feeds)
 for pair in "openwrt:$_row:$_ow" "mtk-openwrt-feeds:$_rmt:$_mt"; do
 	n=${pair%%:*}; rest=${pair#*:}; a=${rest%%:*}; b2=${rest#*:}
-	[ -n "$a" ] && [ -n "$b2" ] || continue
+	# Pojistka musi psat VYSLEDEK, ne pokus. Do 22. 9. tady stalo `|| continue`,
+	# takze kdyz se kterakoli strana nedala precist, smycka tise prosla a o kus niz
+	# se vytisklo "pojistka: piny sedi se SDK". Nesedely - nikdo se nezeptal.
+	[ -n "$a" ] || { echo "STOP: v $ARCH/MANIFEST.txt chybi revize '$n' - recept je neuplny." >&2
+	                 echo "      Bez nej nelze overit, ze SDK plati pro dnesni zaklad." >&2; exit 1; }
+	[ -n "$b2" ] || { echo "STOP: pin '$n' se nepodarilo precist z $PINTREE - pojistku nelze overit." >&2
+	                  echo "      Ocekava se git strom $PINTREE/{openwrt,mtk-openwrt-feeds}." >&2; exit 1; }
 	case "$b2" in "$a"*) ;; *)
 		echo "STOP: $n se posunul od doby, kdy vzniklo tohle SDK." >&2
 		echo "      SDK: $a" >&2
@@ -73,7 +90,7 @@ for pair in "openwrt:$_row:$_ow" "mtk-openwrt-feeds:$_rmt:$_mt"; do
 		exit 1 ;;
 	esac
 done
-echo ">>> pojistka: piny sedi se SDK"
+echo ">>> pojistka: piny sedi se SDK (openwrt $_ow, mtk $_mt)"
 
 # --- SDK: prelozit nase balicky ---------------------------------------------
 mkdir -p "$WORK"

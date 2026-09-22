@@ -105,7 +105,29 @@ for f in "$BIN"/*"$PROFILE"-sdcard.img.gz "$BIN"/*"$PROFILE"-squashfs-sysupgrade
 	[ -f "$f" ] || continue
 	cp -f "$f" "$OUT/"
 done
-( cd "$OUT" && md5sum *.img.gz *.itb > MD5SUMS.txt 2>/dev/null ) || true
+( cd "$OUT" && { date '+# %F %T  varianta '"$VARIANT"; md5sum *.img.gz *.itb; } > MD5SUMS.txt ) || {
+	echo "STOP: md5sum v $OUT selhal - obrazy by sly nasadit bez kontrolniho souctu." >&2
+	exit 1
+}
+
+# PUVOD.txt: kdo tenhle obraz slozil a z ceho.
+#
+# ~/OBRAZY/<varianta>/ ma dva producenty (tenhle skript a pres nej daemon-fast.sh)
+# a img-overit.sh se diva VYHRADNE sem. Kdyz tu lezi obraz z jineho behu, overi se
+# cizi vec a nic to nerekne - 6. 9. 2026 hlasil img-overit sedm rozdilnych souboru
+# a CHYBEL mezi nimi ten, ktery se v tom buildu menil, protoze kontroloval obraz o
+# hodinu starsi. Razitko je jedina vec, podle ktere to jde poznat zpetne.
+{
+	echo "producent : img-build.sh"
+	echo "varianta  : $VARIANT"
+	echo "profil    : $PROFILE"
+	echo "slozeno   : $(date '+%F %T')"
+	echo "archiv    : $ARCH"
+	echo "IB        : $IBD"
+	echo "balicku   : $(wc -w < "$PKGS_FILE")"
+	echo "overlay   : $(find "$FILESDIR" -type f | wc -l) souboru"
+	sed -n '/^RECEPT/,/^$/p' "$ARCH/MANIFEST.txt" 2>/dev/null
+} > "$OUT/PUVOD.txt"
 
 echo
 echo ">>> HOTOVO - vysledky v $OUT"

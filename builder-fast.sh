@@ -105,6 +105,28 @@ echo ">>> pojistka: piny sedi se SDK (openwrt $_ow, mtk $_mt)"
 
 # --- SDK: prelozit nase balicky ---------------------------------------------
 mkdir -p "$WORK"
+
+# SDK i ImageBuilder musi pochazet z TEHOZ archivu, ze ktereho se stavi ted.
+#
+# Do 22. 9. 2026 se rozbalily jen jednou a pak se pouzivaly navzdy - test byl
+# "uz tu neco lezi". Po kazdem plnem buildu tak rychla smycka skladala obraz
+# ze STARE zasoby balicku a tise vracela verze zpatky: 22. 9. mel obraz
+# z rychle smycky ieee1905 r420 proti r421 z plneho buildu, map-controller
+# r609 proti r610 a luci-app-easymesh r175 proti r177. Neohlasilo to nic.
+#
+# Rozbaleni znovu stoji par minut a vsechno v $WORK je z archivu obnovitelne,
+# proto se stare stromy MAZOU a neodkladaji stranou (do 22. 9. se hromadily
+# jako fast-work/stary-* - naslo se jich sedm po peti gigabajtech).
+# Chybejici razitko znamena "nevim, odkud to je" - a to neni duvod tomu verit.
+_RAZ="$WORK/.z-archivu"
+_ZDE=$(cat "$_RAZ" 2>/dev/null || echo "(bez razitka)")
+if [ -d "$WORK" ] && ls -d "$WORK"/openwrt-sdk-* >/dev/null 2>&1 && [ "$_ZDE" != "$ARCH" ]; then
+	echo ">>> SDK+IB nejsou z tohoto archivu, rozbaluji znovu"
+	echo "    byly z  : $_ZDE"
+	echo "    maji byt: $ARCH"
+	rm -rf "$WORK"/openwrt-sdk-* "$WORK"/openwrt-imagebuilder-* "$_RAZ"
+fi
+
 SDKD=$(ls -d "$WORK"/openwrt-sdk-* 2>/dev/null | head -1)
 if [ -z "$SDKD" ]; then
 	echo ">>> rozbaluji SDK"
@@ -180,6 +202,8 @@ if [ "$_n" -lt 100 ]; then
 	exit 1
 fi
 
+printf '%s' "$ARCH" > "$_RAZ"
+
 # cerstve prelozene balicky maji prednost pred temi v IB
 # Sobestacny IB ma soubor `repositories` PRAZDNY. Kdyz uplne CHYBI, apk skonci
 # na "failed to read repositories" a hned za tim vysype seznam balicku, ktere
@@ -237,5 +261,8 @@ ls -l "$IBD"/bin/targets/*/*/*.itb "$IBD"/bin/targets/*/*/*.img.gz 2>/dev/null \
 # ~/img-work/<varianta>/*/packages/ a spusti se img-<varianta>.sh.
 _v=x8; case "$PROFILE" in *pro-8x*) _v=x8 ;; *) _v=universal ;; esac
 echo
-echo ">>> POZOR: img-overit.sh kontroluje ~/OBRAZY/$_v/ a tenhle obraz tam NENI."
-echo "    Bez toho ti overi cizi obraz a nic nerekne."
+echo
+echo ">>> OVER HO:  img-overit-fast.sh universal|x8"
+echo "    Porovna obraz s plnym buildem a projde, jen kdyz se lisi vylucne"
+echo "    v balicich, ktere tahle smycka sama prelozila."
+echo "    (img-overit.sh je na obrazy z img-*.sh a tenhle odmitne - lisit se MA.)"

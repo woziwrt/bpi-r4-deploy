@@ -20,7 +20,18 @@
 set -e
 
 PROFILE="${1:?pouziti: builder-fast.sh <profil> [archiv]   napr. bananapi_bpi-r4}"
-ARCH="${2:-$(ls -dt "$HOME"/archiv/*/ 2>/dev/null | while read d; do [ -d "$d/sdk" ] && { echo "$d"; break; }; done)}"
+# Archiv MUSI odpovidat profilu. x8 plny build archivuje do *-production-x8,
+# universal do *-production. Do 22. 9. 2026 se bral nejnovejsi s sdk/ bez ohledu
+# na profil - a kdyz oba buildy dobehly tyz den, dostal universal SDK z x8.
+_arch_je_x8() { case "$1" in *-production-x8|*-production-x8/) return 0 ;; *) return 1 ;; esac; }
+ARCH="${2:-$(ls -dt "$HOME"/archiv/*/ 2>/dev/null | while read -r d; do
+	[ -d "$d/sdk" ] || continue
+	case "$PROFILE" in
+		*pro-8x*) _arch_je_x8 "$d" || continue ;;
+		*)        _arch_je_x8 "$d" && continue ;;
+	esac
+	echo "$d"; break
+done)}"
 [ -n "$ARCH" ] && [ -d "$ARCH/sdk" ] || { echo "FATAL: nenasel jsem archiv s sdk/. Spust nejdriv plny build." >&2; exit 1; }
 ARCH="${ARCH%/}"
 SHARED="${EASYMESH_SHARED:-$HOME/easymesh-shared}"

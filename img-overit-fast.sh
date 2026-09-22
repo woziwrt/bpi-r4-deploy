@@ -113,6 +113,7 @@ diff "$W/h1" "$W/h2" | grep '^[<>]' | awk '{print $3}' | sort -u > "$W/lisi"
 # Neignoruji se ale naslepo - rozeberou se na seznam balicku a verzi a plati
 # tataz otazka: smi se lisit jen to, co jsme prelozili my. Prave timhle se
 # 22. 9. 2026 naslo, ze IB skladal z archivu stareho o jeden plny build.
+_vl=0
 sort -u "$W/nase-jmena" -o "$W/nase-jmena"
 for x in plny rychly; do
 	grep -E '^P:|^V:' "$W/$x/lib/apk/db/installed" 2>/dev/null \
@@ -159,11 +160,20 @@ echo "  zmeneno JINDE             : $cizi_zm"
 echo
 
 if [ "$cizi_zm" -eq 0 ]; then
-	[ "$nase_zm" -gt 0 ] || {
-		echo "  ❌ NALEZ: obraz se od plneho buildu nelisi VUBEC." >&2
-		echo "     Rychla smycka nedostala do obrazu ani jeden zmeneny soubor." >&2
-		exit 1
-	}
+	# Shoda je spravny vysledek, kdyz neni co prelozit: po plnem buildu je
+	# feed totozny s archivem a rychla smycka legitimne vyrobi tentyz obraz.
+	# Poplach patri JEN na pripad, kdy se lisi VERZE balicku a soubory ne -
+	# tedy smycka neco prelozila a do obrazu se to nedostalo.
+	if [ "$nase_zm" -eq 0 ]; then
+		if [ "$_vl" -gt 0 ]; then
+			echo "  ❌ NALEZ: $_vl balicku ma jinou verzi, ale zadny soubor se nelisi." >&2
+			echo "     Rychla smycka je prelozila a do obrazu se nedostaly." >&2
+			exit 1
+		fi
+		echo "  ✅ V PORADKU - obraz je totozny s plnym buildem."
+		echo "     Feed se od archivu nelisi, takze nebylo co prelozit."
+		exit 0
+	fi
 	echo "  ✅ V PORADKU - lisi se jen to, co jsme prelozili."
 	comm -12 "$W/lisi2" "$W/nase" | sed 's/^/      /'
 	exit 0

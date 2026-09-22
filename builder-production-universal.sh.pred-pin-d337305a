@@ -39,7 +39,7 @@ easymesh_require_clean_trees
 # ale WPS onboarding meshe na tom tlacitku stoji) a ba3243bba03 (auth_type pri
 # nenastavenem encryption).
 #
-# STAV OVERENI: postaveno 16. 9. 08:16 (build-production-2026-09-16-bump2.log). MTK e55f4f30 se starym kernelem .103 postaven na x8 16. 9. v 06:58
+# STAV OVERENI: MTK e55f4f30 se starym kernelem .103 postaven na x8 16. 9. v 06:58
 # bez jedine chyby patche. Kombinace s kernelem .108 se stavi timto pinem POPRVE a
 # NA ZELEZE NENI OVERENA - do uzivatelskych vetvi az po testu.
 OPENWRT_COMMIT=${OPENWRT_COMMIT:-9facdff6fb001b7a4e8cea395b89278fd49ca92f}
@@ -135,6 +135,7 @@ patch -p1 -d mtk-openwrt-feeds < my_files/999-crypto-02-lookaside-hash-static.pa
 \cp -r my_files/999-sfp-11-rtl8261be-mdio-none.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-sfp-22-rtl8261be-boot-1g-reprobe.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-eth-21-mtk-gdm-rx-fsm-reset.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+# 999-ephy-zz-01-fix-aqr-mib-thread-lifetime.patch se uz nekopiruje.
 #
 # MTK ho prevzal 2026-09-02 jako fc14f9a a je od pinu 6aeae9ebf primo v jejich
 # 999-ephy-aqr113c-04-add-mib-debugfs.patch. Aplikovat obe verze nejde a jejich
@@ -143,7 +144,17 @@ patch -p1 -d mtk-openwrt-feeds < my_files/999-crypto-02-lookaside-hash-static.pa
 #
 # VAZANO NA PIN: pri navratu na MTK pin starsi nez 6aeae9ebf musi tento radek
 # zpet, jinak v obrazu neni ANI JEDNA verze a panic pri vytazeni SFP se vraci.
+# DROP_PCS10=1: test Bo-Cunovy opravy (MTK ba3f4f514e, v pinu od d337305adb).
+# Ta prepisuje update_state() v 999-pcs-07, takze nas 999-pcs-10 na ni nesedne;
+# s novym pinem se staví VZDY s DROP_PCS10=1, se starym bez nej.
+# LYNXI_DEBUG=1 prida logovani stavu lynxi pri kazdem pollu (jen pro test).
+if [ "${DROP_PCS10:-0}" != 1 ]; then
 \cp -r my_files/999-pcs-10-lynxi-hold-link-down-on-invalid-speed.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+fi
+if [ "${LYNXI_DEBUG:-0}" = 1 ]; then
+\cp -r my_files/999-pcs-98-lynxi-debug-state.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+fi
+\cp -r my_files/999-fix-01-mac80211-btwt-ap-mode.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mac80211/patches/subsys/0999-fix-mac80211-btwt-ap-mode-he-btwt-supported.patch
 ### A/B ZMERENO 2026-09-01 na zeleze: bez tohoto patche projde pres IPsec
 ### tunel po Wi-Fi jen 9 z 60 paketu (85 % ztrat), s nim 60/60. Patch je
 ### nutny I BEZ EIP. Ztrata je v ODCHOZI ceste a je TICHA - zadna hlaska,
@@ -154,10 +165,15 @@ patch -p1 -d mtk-openwrt-feeds < my_files/999-crypto-02-lookaside-hash-static.pa
 # (commit 2b48bf00, 3. 9.). Jejich verze obsahuje navic druhy commit
 # 'xfrm: fix stale skb->prev after async crypto steals a GSO segment'.
 # Ponechani naseho by patch aplikovalo DVAKRAT a build by spadl.
+#\cp -r my_files/999-fix-00-xfrm-propagate-einprogress.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
+\cp -r my_files/0264-wpa_s-add-btwt-join-command.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/network/services/hostapd/patches/0264-wpa_s-add-btwt-join-command.patch
 
 ### tx_power check Ivan Mironov's patch - for defective BE14 boards with defective eeprom flash
+#\cp -r my_files/100-wifi-mt76-mt7996-Use-tx_power-from-default-fw-if-EEP.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches
 
 ### per-band WiFi LED (MT7996, single-wiphy MLO) + shared tpt trigger - HW verified 2026-06-28
+\cp -r my_files/999-wifi-01-mt7996-per-band-leds.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches/9999-w-mt7996-per-band-leds.patch
+\cp -r my_files/999-wifi-02-mt76-share-tpt-led-trigger.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches/9999-w-mt76-share-tpt-led-trigger.patch
 
 
 ### mt76-vendor: MTK feed ships cmake_minimum_required(VERSION 2.8); host CMake 4.x

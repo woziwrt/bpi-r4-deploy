@@ -104,6 +104,24 @@ printf "    souboru     : %s (plny) vs %s (rychly)\n\n" "$n1" "$n2"
 	exit 1
 }
 
+# OCEKAVANE="map-agent wpad-openssl ...": packages built OUTSIDE the SDK on
+# purpose - in the full tree and dropped into the IB (daemons, hostapd). They
+# may differ in version and in their own files; nothing else may. Their file
+# lists come from the NEW image's /lib/apk/packages/<pkg>.list, so a file the
+# new build adds is covered too.
+#
+# Until 2026-09-23 the only allowed difference was our seven SDK packages, and
+# the first image with a patched wpad and map-agent stopped at the version
+# check without ever comparing a file.
+for _p in ${OCEKAVANE:-}; do
+	_l="$W/rychly/lib/apk/packages/$_p.list"
+	[ -s "$_l" ] || { echo "STOP: OCEKAVANE '$_p' neni v novem obrazu ($_l)." >&2; exit 1; }
+	sed 's#^/#./#' "$_l" >> "$W/nase"
+	echo "$_p" >> "$W/nase-jmena"
+	echo "    ocekavany   : $_p ($(grep -c . "$_l") souboru)"
+done
+[ -n "${OCEKAVANE:-}" ] && { sort -u "$W/nase" -o "$W/nase"; echo; }
+
 ( cd "$W/plny"   && find . -type f -exec md5sum {} + | sort -k2 ) > "$W/h1"
 ( cd "$W/rychly" && find . -type f -exec md5sum {} + | sort -k2 ) > "$W/h2"
 # Rozdil v OBOU smerech - soubor smazany z rychleho obrazu je taky nalez.

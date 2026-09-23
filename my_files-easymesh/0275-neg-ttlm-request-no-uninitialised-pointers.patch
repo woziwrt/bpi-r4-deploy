@@ -1,0 +1,162 @@
+hostapd: Neg-TTLM request - no uninitialised pointers, no clobbered map
+
+Follow-up to 0274, from an independent review of MTK 0129.
+
+1. ieee802_11_rx_neg_ttlm_req() assigned neg_ttlm_req and neg_ttlm only
+   after the MLD, STA and Adv-TTLM checks, but every one of those paths
+   jumps to fail:, which reads neg_ttlm_req->dialog_token and may memset
+   neg_ttlm - both uninitialised. A Neg-TTLM request that arrives while
+   Advertised TTLM is active takes exactly that path. The frame length was
+   not checked before reading the token either. Read the token first,
+   return if the frame cannot carry one. A frame from a non-MLD AP or an
+   address with no associated MLD station is dropped, not answered.
+
+2. The request was parsed straight into the live sta->neg_ttlm. A second
+   request that is malformed or refused overwrote a map that was already
+   negotiated and programmed, and a failed send then tore it down. Parse
+   into a local copy and commit it only on success; tear down on a failed
+   send only what was just committed. The window between the commit and
+   the ACK, and the fall back to the default map on ok=0, are documented.
+
+3. "session expired", "unexpected TX status" and, for Protected EHT only,
+   handle_action_cb "STA not found" were MSG_DEBUG, which is why a map that
+   never reached the driver (0274) left nothing in the log. Raise to INFO.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+
+--- a/src/ap/ieee802_11_eht.c	2026-09-23 12:20:11.971806210 +0200
++++ b/src/ap/ieee802_11_eht.c	2026-09-23 12:20:11.980082898 +0200
+@@ -1946,13 +1946,13 @@
+ 
+ 	neg_ttlm = &assoc_sta->neg_ttlm;
+ 	if (!neg_ttlm->valid) {
+-		wpa_printf(MSG_DEBUG,
++		wpa_printf(MSG_INFO,
+ 			   "MLD: Unexpected Negotiated TTLM Request TX status");
+ 		return;
+ 	}
+ 
+ 	if (dialog_token != neg_ttlm->dialog_token) {
+-		wpa_printf(MSG_DEBUG,
++		wpa_printf(MSG_INFO,
+ 			   "MLD: Negotiated TTLM session expired for %u",
+ 			   dialog_token);
+ 		return;
+@@ -3119,29 +3119,41 @@
+ 	struct hostapd_data *assoc_hapd;
+ 	struct neg_ttlm_req *neg_ttlm_req;
+ 	struct ieee802_11_elems elems;
+-	struct ieee80211_neg_ttlm *neg_ttlm;
+-	struct sta_info *sta;
+-	u8 direction;
++	struct ieee80211_neg_ttlm neg_ttlm;
++	struct sta_info *sta = NULL;
++	u8 direction, dialog_token;
+ 	u16 status_code = WLAN_STATUS_DENIED_TID_TO_LINK_MAPPING;
+ 	int ret = 0, tid;
+ 
++	/* Every exit below answers with the request's dialog token, including
++	 * the early ones, so the frame has to carry one and it has to be read
++	 * before the first goto. The pointers used to be assigned only after
++	 * the MLD, STA and Adv-TTLM checks, and those paths read the token
++	 * through an uninitialised pointer. */
++	if (len < sizeof(*neg_ttlm_req))
++		return;
++	neg_ttlm_req = (struct neg_ttlm_req *)frm;
++	dialog_token = neg_ttlm_req->dialog_token;
++
++	/* Not an AP MLD, or not an MLD station we have associated: drop the
++	 * frame. Answering an address we do not have a station for is worse
++	 * than answering nothing. */
+ 	/* TODO Check if AP MLD support Neg-TTLM */
+ 	if (!hostapd_is_mld_ap(hapd))
+-		goto fail;
++		return;
+ 
+ 	sta = ap_get_sta(hapd, addr);
+ 	if (!sta || !ap_sta_is_mld(hapd, sta))
+-		goto fail;
++		return;
+ 
+ 	sta = hostapd_ml_get_assoc_sta(hapd, sta, &assoc_hapd);
+ 	if (!sta)
+-		goto fail;
++		return;
+ 
+ 	/* TODO check the relationship between Adv-TTLM and Neg-TTLM */
+ 	if (hostapd_is_attlm_active(hapd))
+ 		goto fail;
+ 
+-	neg_ttlm_req = (struct neg_ttlm_req *)frm;
+ 	if (ieee802_11_parse_elems(neg_ttlm_req->variable, len - 1, &elems, 1) ==
+ 	    ParseFailed || elems.ttlm_num == 0) {
+ 		wpa_printf(MSG_ERROR, "Invalid neg-TTLM request format\n");
+@@ -3156,13 +3168,11 @@
+ 		goto fail;
+ 	}
+ 
+-	neg_ttlm = &sta->neg_ttlm;
++	/* Parse into a local copy. The parser starts with a memset, and a
++	 * request that turns out to be malformed or is refused must not
++	 * overwrite a map that is already negotiated and programmed. */
+ 	ret = ieee802_11_parse_neg_ttlm(hapd, elems.ttlm[0], elems.ttlm_len[0],
+-					neg_ttlm, &direction);
+-	/* The parser starts with a memset of the whole struct - set the token
+-	 * after it, or the TX status callback compares against 0 and never
+-	 * programs the driver. */
+-	neg_ttlm->dialog_token = neg_ttlm_req->dialog_token;
++					&neg_ttlm, &direction);
+ 
+ 	if (ret) {
+ 		wpa_printf(MSG_ERROR, "Invalid TTLM format");
+@@ -3174,14 +3184,26 @@
+ 		goto fail;
+ 	}
+ 
++	/* Commit only now. The token goes in after the parser, whose memset
++	 * would clear it: the TX status callback matches the Response against
++	 * this token before it programs the driver. */
++	neg_ttlm.dialog_token = dialog_token;
++	sta->neg_ttlm = neg_ttlm;
++	/* From here until the Response is acknowledged, sta->neg_ttlm holds
++	 * the NEW map while the driver still runs the old one. Anything that
++	 * reads it in that window (teardown, an AP-initiated request, the CLI)
++	 * sees a map that is not in force yet. If the ACK never comes (ok=0),
++	 * the callback tears down to the default mapping, not back to the old
++	 * one: we cannot know whether the station already switched. */
+ 	status_code = WLAN_STATUS_SUCCESS;
+ fail:
+-	ret = ieee802_11_send_neg_ttlm_resp(hapd, addr, neg_ttlm_req->dialog_token, status_code);
++	ret = ieee802_11_send_neg_ttlm_resp(hapd, addr, dialog_token, status_code);
+ 
+-	if (ret) {
+-		/* For synchronization */
++	if (ret && status_code == WLAN_STATUS_SUCCESS) {
++		/* For synchronization: the map was committed above and its
++		 * Response never left, so neither side may keep it. */
+ 		ieee802_11_send_neg_ttlm_teardown(hapd, addr);
+-		os_memset(neg_ttlm, 0, sizeof(*neg_ttlm));
++		os_memset(&sta->neg_ttlm, 0, sizeof(sta->neg_ttlm));
+ 	}
+ }
+ 
+--- a/src/ap/ieee802_11.c	2026-09-23 12:20:11.967015808 +0200
++++ b/src/ap/ieee802_11.c	2026-09-23 12:20:11.980531328 +0200
+@@ -7976,8 +7976,15 @@
+ 		return;
+ 	sta = ap_get_sta(hapd, mgmt->da);
+ 	if (!sta) {
+-		wpa_printf(MSG_DEBUG, "handle_action_cb: STA " MACSTR
+-			   " not found", MAC2STR(mgmt->da));
++		/* INFO for Protected EHT: a TTLM Response whose TX status is
++		 * dropped here never programs the driver, and at DEBUG that
++		 * leaves no trace. Everything else stays at DEBUG - stations
++		 * that just left would flood the log. */
++		wpa_printf(len > IEEE80211_HDRLEN &&
++			   mgmt->u.action.category == WLAN_ACTION_PROTECTED_EHT ?
++			   MSG_INFO : MSG_DEBUG,
++			   "handle_action_cb: STA " MACSTR " not found",
++			   MAC2STR(mgmt->da));
+ 		return;
+ 	}
+ 

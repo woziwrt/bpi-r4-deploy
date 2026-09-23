@@ -117,6 +117,12 @@ easymesh_apply_wifi_patches() {
 	\cp -r "$P/0274-neg-ttlm-keep-dialog-token-across-parse.patch" \
 		"$MAC80211/package/network/services/hostapd/patches/0274-neg-ttlm-keep-dialog-token-across-parse.patch"
 
+	# Neg-TTLM request: the early reject paths read the dialog token through an
+	# uninitialised pointer (a request during Adv-TTLM could crash hostapd), and
+	# a refused request clobbered an already negotiated map (review 2026-09-23).
+	\cp -r "$P/0275-neg-ttlm-request-no-uninitialised-pointers.patch" \
+		"$MAC80211/package/network/services/hostapd/patches/0275-neg-ttlm-request-no-uninitialised-pointers.patch"
+
 	# per-band WiFi LED (MT7996 single-wiphy MLO) + shared tpt trigger.
 	\cp -r "$P/999-wifi-01-mt7996-per-band-leds.patch" \
 		"$MAC80211/package/kernel/mt76/patches/9999-w-mt7996-per-band-leds.patch"

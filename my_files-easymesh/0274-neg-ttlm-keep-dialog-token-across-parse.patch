@@ -1,0 +1,32 @@
+hostapd: keep the Neg-TTLM dialog token across parsing the request
+
+ieee802_11_rx_neg_ttlm_req() stores the request dialog token in
+sta->neg_ttlm and then calls ieee802_11_parse_neg_ttlm(), which starts
+with os_memset(neg_ttlm, 0, ...). The token is 0 from then on. The
+Response goes out with SUCCESS and the real token, and its TX status
+callback drops it as "session expired" because the token does not match,
+so hostapd_drv_set_sta_ttlm() is never called. The station applies the
+map to its uplink; the AP keeps sending downlink on every link.
+
+Measured on 2026-09-23 with a 6 GHz-only map: station uplink 5 GHz +0 B,
+AP downlink 5 GHz +60.9 MB against 6 GHz +30.7 MB, and the AP kernel
+logged mt7996_mcu_peer_mld_ttlm_req only at the teardown.
+
+Store the token after the parser.
+
+--- a/src/ap/ieee802_11_eht.c	2026-09-23 10:59:57.176908705 +0200
++++ b/src/ap/ieee802_11_eht.c	2026-09-23 10:59:57.188062781 +0200
+@@ -3157,9 +3157,12 @@
+ 	}
+ 
+ 	neg_ttlm = &sta->neg_ttlm;
+-	neg_ttlm->dialog_token = neg_ttlm_req->dialog_token;
+ 	ret = ieee802_11_parse_neg_ttlm(hapd, elems.ttlm[0], elems.ttlm_len[0],
+ 					neg_ttlm, &direction);
++	/* The parser starts with a memset of the whole struct - set the token
++	 * after it, or the TX status callback compares against 0 and never
++	 * programs the driver. */
++	neg_ttlm->dialog_token = neg_ttlm_req->dialog_token;
+ 
+ 	if (ret) {
+ 		wpa_printf(MSG_ERROR, "Invalid TTLM format");

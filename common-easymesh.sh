@@ -544,7 +544,12 @@ easymesh_setup_iopsys_feed() {
 	#   odpovidajici tag, ten se odsud nepretahuje)
 	# Bez toho by `git reset --hard` nize kazdy takovy pokus prepsal zpatky
 	# na aktualni pin a build by tise vyrobil dnesek misto vcerejska.
-	local pin=${IOPSYS_PIN:-810df6cfe}
+	# pin 2026-09-23 -> 0140ede39: map-controller sends a TTLM policy seen for
+	# the first time (B02); map-agent guards a TTLM pin on the parent and
+	# tears it down on a silent tick, all-zero map = teardown (B03). HW
+	# 23. 9.: fresh policy in the radios in 4 s, fuse started and ended itself.
+	# predchozi pin 810df6cfe (relay: multicast duplicate check per origin)
+	local pin=${IOPSYS_PIN:-0140ede39}
 	( cd "${EASYMESH_SHARED}/iopsys-feed" \
 	  && { git rev-parse --verify -q "${pin}^{commit}" >/dev/null 2>&1 || git fetch --all --tags; } \
 	  && git reset --hard "${pin}" && git clean -fd ) || {

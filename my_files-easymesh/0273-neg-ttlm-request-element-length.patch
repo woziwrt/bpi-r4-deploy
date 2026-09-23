@@ -1,0 +1,23 @@
+hostapd: size the Neg-TTLM request element for 1-octet link maps
+
+ieee802_11_send_neg_ttlm_request() always reserved and announced room for
+eight 2-octet link maps, but with link_map_size=1 it writes eight 1-octet
+maps. The element then claims 19 octets and carries 11, mac80211 on the
+station drops it as malformed (ttlm_num == 0) and answers
+DENIED_TID_TO_LINK_MAPPING without ever asking the driver - which is the
+"TTLM: STA rejected TTLM request" we logged on 2026-09-22. It became
+reachable once 0269 made link_map_size= parse; before that it was always 0.
+
+Count the maps at the size they are written.
+
+--- a/src/ap/ieee802_11_eht.c	2026-09-23 09:51:45.023887486 +0200
++++ b/src/ap/ieee802_11_eht.c	2026-09-23 09:51:45.030355463 +0200
+@@ -3552,7 +3552,7 @@
+ 	       1 + /* len */
+ 	       1 + /* Element ID Extension */
+ 	       2 + /* Control */
+-	       2 * IEEE80211_TTLM_NUM_TIDS; /* Link Mapping of each TID */
++	       (map_size ? 1 : 2) * IEEE80211_TTLM_NUM_TIDS; /* Link Mapping of each TID */
+ 
+ 	buf = wpabuf_alloc(len);
+ 	if (!buf)

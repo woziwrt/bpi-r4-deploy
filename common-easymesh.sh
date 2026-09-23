@@ -104,6 +104,12 @@ easymesh_apply_wifi_patches() {
 	\cp -r "$P/0272-ctrl-iface-replies-must-not-block.patch" \
 		"$MAC80211/package/network/services/hostapd/patches/0272-ctrl-iface-replies-must-not-block.patch"
 
+	# Neg-TTLM request from the AP with link_map_size=1 announced 16 octets of
+	# link maps and sent 8; the station dropped the element and rejected every
+	# request (2026-09-22, "TTLM: STA rejected TTLM request").
+	\cp -r "$P/0273-neg-ttlm-request-element-length.patch" \
+		"$MAC80211/package/network/services/hostapd/patches/0273-neg-ttlm-request-element-length.patch"
+
 	# per-band WiFi LED (MT7996 single-wiphy MLO) + shared tpt trigger.
 	\cp -r "$P/999-wifi-01-mt7996-per-band-leds.patch" \
 		"$MAC80211/package/kernel/mt76/patches/9999-w-mt7996-per-band-leds.patch"

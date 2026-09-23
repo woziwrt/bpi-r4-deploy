@@ -1,0 +1,63 @@
+From e783cf35e0df1ea3fad2eef0d87a7b3371f4fdfb Mon Sep 17 00:00:00 2001
+From: Peter Chiu <chui-hao.chiu@mediatek.com>
+Date: Mon, 7 Sep 2026 14:42:03 +0800
+Subject: [PATCH] mtk: mt76: mt7996: Update wcid idx when sending null func
+
+Problem:
+Update wcid idx to peer wcid idx when sending null func.
+
+Root Cause:
+The code always uses the default wcid from mlink, without
+checking if a peer wcid should be used for the null func.
+
+Solution:
+Add logic to determine the correct wcid by checking if a
+station is present and retrieving its associated wcid.
+Update the transmission function to use the correct wcid.
+
+Feature:
+Beacon Loss Monitor
+
+Signed-off-by: Peter Chiu <chui-hao.chiu@mediatek.com>
+---
+ mt7996/mac.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/mt7996/mac.c b/mt7996/mac.c
+index e38fc152b..f976091c9 100644
+--- a/mt7996/mac.c
++++ b/mt7996/mac.c
+@@ -4226,6 +4226,8 @@ mt7996_beacon_mon_send_probe(struct mt7996_phy *phy, struct mt7996_vif *mvif,
+ 	struct ieee80211_hw *hw = phy->mt76->hw;
+ 	struct mt76_vif_link *mlink;
+ 	struct ieee80211_tx_info *info;
++	struct ieee80211_sta *sta;
++	struct mt76_wcid *wcid;
+ 	struct sk_buff *skb;
+ 	int ret = 0, band_idx = phy->mt76->band_idx;
+ 	int band;
+@@ -4275,8 +4277,20 @@ mt7996_beacon_mon_send_probe(struct mt7996_phy *phy, struct mt7996_vif *mvif,
+ 		return -EINVAL;
+ 	}
+ 
++	/* find peer wcid */
++	wcid = mlink->wcid;
++	sta = ieee80211_vif_is_mld(vif) ?
++	      ieee80211_find_sta_by_link_addrs(hw, conf->bssid, conf->addr, NULL) :
++	      ieee80211_find_sta(vif, conf->bssid);
++	if (sta) {
++		struct mt7996_sta *msta = (void *)sta->drv_priv;
++		struct mt7996_sta_link *msta_link = mt7996_sta_link(msta, link_id);
++		if (msta_link)
++			wcid = &msta_link->wcid;
++	}
++
+ 	local_bh_disable();
+-	mt76_tx(phy->mt76, NULL, mlink->wcid, skb);
++	mt76_tx(phy->mt76, NULL, wcid, skb);
+ 	local_bh_enable();
+ 
+ 	mvif->probe[band_idx] = (void *)skb;
+-- 
+2.45.2
+

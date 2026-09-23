@@ -123,6 +123,14 @@ easymesh_apply_wifi_patches() {
 	\cp -r "$P/0275-neg-ttlm-request-no-uninitialised-pointers.patch" \
 		"$MAC80211/package/network/services/hostapd/patches/0275-neg-ttlm-request-no-uninitialised-pointers.patch"
 
+	# Backport of MTK 73e7f7db (2026-09-07, after our pin e55f4f30d): the beacon
+	# loss monitor sent its nullfunc with the vif link wcid instead of the
+	# parent AP's, so "No ack for nullfunc" after "detect 20 beacon loss" was
+	# not evidence of anything. Same file name as MTK's, so moving the pin past
+	# it replaces this copy instead of applying it twice.
+	\cp -r "$P/0118-cp-mtk-mt76-mt7996-Update-wcid-idx-when-sending-null-fu.patch" \
+		"$MAC80211/package/kernel/mt76/patches/0118-cp-mtk-mt76-mt7996-Update-wcid-idx-when-sending-null-fu.patch"
+
 	# per-band WiFi LED (MT7996 single-wiphy MLO) + shared tpt trigger.
 	\cp -r "$P/999-wifi-01-mt7996-per-band-leds.patch" \
 		"$MAC80211/package/kernel/mt76/patches/9999-w-mt7996-per-band-leds.patch"

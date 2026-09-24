@@ -161,11 +161,15 @@ grep -v -e '^\./etc/apk/world$' -e '^\./lib/apk/db/installed$' \
 
 # /lib/apk/packages/<balicek>.list je seznam souboru daneho balicku. Kdyz nas
 # balicek dostane novy soubor, zmeni se i tenhle seznam - a v .pkgdir neni,
-# takze by se pocital za cizi. Povoluji se JMENOVITE jen seznamy NASICH
+# takze by se pocital za cizi. Povoluji se JMENOVITE jen metadata NASICH
 # balicku: kdyz se zmeni seznam ciziho balicku, je to porad nalez.
+# Totez .conffiles a .conffiles_static (seznam a kontrolni soucty jeho
+# konfiguracnich souboru): 24. 9. 2026 zmena komentare v easymesh-trace.conf
+# zmenila jeho soucet a overeni hlasilo "1 soubor MIMO nase balicky" na kazdem
+# ze sesti obrazu toho dne, pritom slo o nas balicek.
 while read -r _nase_pkg; do
 	[ -n "$_nase_pkg" ] || continue
-	grep -v -x "\./lib/apk/packages/$_nase_pkg\.list" "$W/lisi2" > "$W/lisi2.tmp" || true
+	grep -v -x -E "\./lib/apk/packages/$_nase_pkg\.(list|conffiles|conffiles_static)" "$W/lisi2" > "$W/lisi2.tmp" || true
 	mv "$W/lisi2.tmp" "$W/lisi2"
 done < "$W/nase-jmena"
 comm -23 "$W/lisi2" "$W/nase" > "$W/cizi" || true

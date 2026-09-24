@@ -544,7 +544,12 @@ easymesh_setup_iopsys_feed() {
 	#   odpovidajici tag, ten se odsud nepretahuje)
 	# Bez toho by `git reset --hard` nize kazdy takovy pokus prepsal zpatky
 	# na aktualni pin a build by tise vyrobil dnesek misto vcerejska.
-	# pin 2026-09-24 -> 75cc233ce: a bSTA MLD is reported with 0xE1, not 0xCB
+	# pin 2026-09-24 -> b603a52c1: libwifi reads a 4addr STA-MLD (backhaul bSTA)
+	# from its AP_VLAN netdev (ap-mld-N.staM), where the kernel lists its links;
+	# wifi.ap/wifi.apmld stations carried tx/rx rate 0 for every backhaul
+	# station. HW 24. 9.: rates per link in both ubus views. map-agent still
+	# reports dl/ul_rate 0 to the controller (open, agent side).
+	# predchozi pin 2026-09-24 -> 75cc233ce: a bSTA MLD is reported with 0xE1, not 0xCB
 	# (EasyMesh v6.1 6.2 shall not); the controller learns the bSTAs from 0xE1.
 	# HW 24. 9.: all four agents send one 0xE1 and no 0xCB in 0x8028, the
 	# controller lists all eight bSTA links.
@@ -553,7 +558,7 @@ easymesh_setup_iopsys_feed() {
 	# tears it down on a silent tick, all-zero map = teardown (B03). HW
 	# 23. 9.: fresh policy in the radios in 4 s, fuse started and ended itself.
 	# predchozi pin 810df6cfe (relay: multicast duplicate check per origin)
-	local pin=${IOPSYS_PIN:-75cc233ce}
+	local pin=${IOPSYS_PIN:-b603a52c1}
 	( cd "${EASYMESH_SHARED}/iopsys-feed" \
 	  && { git rev-parse --verify -q "${pin}^{commit}" >/dev/null 2>&1 || git fetch --all --tags; } \
 	  && git reset --hard "${pin}" && git clean -fd ) || {

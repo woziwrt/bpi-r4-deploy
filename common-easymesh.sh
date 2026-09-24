@@ -544,12 +544,16 @@ easymesh_setup_iopsys_feed() {
 	#   odpovidajici tag, ten se odsud nepretahuje)
 	# Bez toho by `git reset --hard` nize kazdy takovy pokus prepsal zpatky
 	# na aktualni pin a build by tise vyrobil dnesek misto vcerejska.
-	# pin 2026-09-23 -> 0140ede39: map-controller sends a TTLM policy seen for
+	# pin 2026-09-24 -> 75cc233ce: a bSTA MLD is reported with 0xE1, not 0xCB
+	# (EasyMesh v6.1 6.2 shall not); the controller learns the bSTAs from 0xE1.
+	# HW 24. 9.: all four agents send one 0xE1 and no 0xCB in 0x8028, the
+	# controller lists all eight bSTA links.
+	# predchozi pin 2026-09-23 -> 0140ede39: map-controller sends a TTLM policy seen for
 	# the first time (B02); map-agent guards a TTLM pin on the parent and
 	# tears it down on a silent tick, all-zero map = teardown (B03). HW
 	# 23. 9.: fresh policy in the radios in 4 s, fuse started and ended itself.
 	# predchozi pin 810df6cfe (relay: multicast duplicate check per origin)
-	local pin=${IOPSYS_PIN:-0140ede39}
+	local pin=${IOPSYS_PIN:-75cc233ce}
 	( cd "${EASYMESH_SHARED}/iopsys-feed" \
 	  && { git rev-parse --verify -q "${pin}^{commit}" >/dev/null 2>&1 || git fetch --all --tags; } \
 	  && git reset --hard "${pin}" && git clean -fd ) || {

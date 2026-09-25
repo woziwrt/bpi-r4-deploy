@@ -544,7 +544,12 @@ easymesh_setup_iopsys_feed() {
 	#   odpovidajici tag, ten se odsud nepretahuje)
 	# Bez toho by `git reset --hard` nize kazdy takovy pokus prepsal zpatky
 	# na aktualni pin a build by tise vyrobil dnesek misto vcerejska.
-	# pin 2026-09-25 -> 0c5d23f12: map-agent answers the Associated STA
+	# pin 2026-09-25b -> a7d9731a2: map-agent adds, once a minute, AP MLD
+	# station links it missed the association event of (a backhaul bSTA and
+	# an MLO phone unreported for hours after node restarts). Known stations
+	# untouched. HW 25. 9.: bedroom-bad runs it, clients unchanged, silent
+	# while nothing is missing; the positive case is waited for overnight.
+	# predchozi pin 2026-09-25 -> 0c5d23f12: map-agent answers the Associated STA
 	# Extended Link Metrics (0xC8) under the queried (MLD) address, and
 	# map-controller files the AP Metrics channel utilization per radio.
 	# HW 25. 9.: controller shows dl/ul_rate of backhaul bSTAs (864/720 and
@@ -564,7 +569,7 @@ easymesh_setup_iopsys_feed() {
 	# tears it down on a silent tick, all-zero map = teardown (B03). HW
 	# 23. 9.: fresh policy in the radios in 4 s, fuse started and ended itself.
 	# predchozi pin 810df6cfe (relay: multicast duplicate check per origin)
-	local pin=${IOPSYS_PIN:-0c5d23f12}
+	local pin=${IOPSYS_PIN:-a7d9731a2}
 	( cd "${EASYMESH_SHARED}/iopsys-feed" \
 	  && { git rev-parse --verify -q "${pin}^{commit}" >/dev/null 2>&1 || git fetch --all --tags; } \
 	  && git reset --hard "${pin}" && git clean -fd ) || {

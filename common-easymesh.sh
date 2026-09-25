@@ -544,7 +544,13 @@ easymesh_setup_iopsys_feed() {
 	#   odpovidajici tag, ten se odsud nepretahuje)
 	# Bez toho by `git reset --hard` nize kazdy takovy pokus prepsal zpatky
 	# na aktualni pin a build by tise vyrobil dnesek misto vcerejska.
-	# pin 2026-09-24 -> b603a52c1: libwifi reads a 4addr STA-MLD (backhaul bSTA)
+	# pin 2026-09-25 -> 0c5d23f12: map-agent answers the Associated STA
+	# Extended Link Metrics (0xC8) under the queried (MLD) address, and
+	# map-controller files the AP Metrics channel utilization per radio.
+	# HW 25. 9.: controller shows dl/ul_rate of backhaul bSTAs (864/720 and
+	# 360/432 Mbit/s instead of 0), radio.total_utilization non-zero on all
+	# five nodes.
+	# predchozi pin 2026-09-24 -> b603a52c1: libwifi reads a 4addr STA-MLD (backhaul bSTA)
 	# from its AP_VLAN netdev (ap-mld-N.staM), where the kernel lists its links;
 	# wifi.ap/wifi.apmld stations carried tx/rx rate 0 for every backhaul
 	# station. HW 24. 9.: rates per link in both ubus views. map-agent still
@@ -558,7 +564,7 @@ easymesh_setup_iopsys_feed() {
 	# tears it down on a silent tick, all-zero map = teardown (B03). HW
 	# 23. 9.: fresh policy in the radios in 4 s, fuse started and ended itself.
 	# predchozi pin 810df6cfe (relay: multicast duplicate check per origin)
-	local pin=${IOPSYS_PIN:-b603a52c1}
+	local pin=${IOPSYS_PIN:-0c5d23f12}
 	( cd "${EASYMESH_SHARED}/iopsys-feed" \
 	  && { git rev-parse --verify -q "${pin}^{commit}" >/dev/null 2>&1 || git fetch --all --tags; } \
 	  && git reset --hard "${pin}" && git clean -fd ) || {

@@ -97,16 +97,6 @@ easymesh_apply_wifi_patches() {
 		< "$P/0271-hostapd-restart-mld-sibling-radios.patch" ||
 		{ echo "FATAL: 0271 MLD sibling restart patch does not apply" >&2; return 1; }
 
-	# A mesh backhaul that lost its parent stopped its APs at once, so every
-	# backhaul move (steer, parent reboot) took the fronthaul down for ~26 s,
-	# although the mesh is on one channel. A backhaul that was connected now
-	# gets 20 s to reconnect with the APs up; boot/first join unchanged.
-	# 2026-09-27, tested on kitchen (8 s reconnect: APs stayed up; 38 s: APs
-	# stopped at 20 s, back on COMPLETED).
-	patch -p1 -N -d "$MAC80211/package/network/services/hostapd/files" \
-		< "$P/0276-wpa_supplicant-apsta-grace-before-stopping-aps.patch" ||
-		{ echo "FATAL: 0276 apsta grace patch does not apply" >&2; return 1; }
-
 	# hostapd sent ctrl_iface replies with a blocking sendto(); a client that
 	# stopped reading (wifimngr, events filled its buffer) froze the whole
 	# hostapd in sock_alloc_send_pskb - x8, 2026-09-18, ~3 min, a mesh child

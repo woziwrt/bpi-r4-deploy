@@ -1,0 +1,140 @@
+From: Petr Wozniak <petr.wozniak@gmail.com>
+Subject: [PATCH] wpa_supplicant.uc: a mesh backhaul gets 20 s before its APs stop
+
+A mesh backhaul station that lost its parent stopped the APs on its radios
+at once, so it could follow a parent to another channel. In a mesh on one
+channel that is needless: every backhaul move - a steer, a parent that
+reboots - took the fronthaul down for ~26 s (2026-09-27, a leaf steered
+16:05:28-54), although the new parent was on the same channel and the
+backhaul associates with the APs running.
+
+A backhaul that was connected now gets 20 s to find a parent with the APs
+still up. Only if it has not reached COMPLETED by then are the APs stopped,
+as before (a parent on another channel). A backhaul that was never
+connected (boot, first join) stops them at once, as before, and APs that
+were never stopped are not restarted when it reconnects.
+
+Tested on a leaf, 2026-09-27: reconnect after 8 s - 5/5 AP links up
+throughout; no parent for 38 s - APs stopped at 20 s, restarted on
+COMPLETED.
+
+---
+--- a/wpa_supplicant.uc
++++ b/wpa_supplicant.uc
+@@ -20,6 +20,7 @@
+ wpas.data.iface_ubus = {};
+ wpas.data.macaddr_list = {};
+ wpas.data.sta_state = {};
++wpas.data.bh = {};
+ 
+ function iface_stop(iface)
+ {
+@@ -713,6 +714,88 @@
+ 	return false;
+ }
+ 
++// A mesh backhaul that loses its parent stops the APs on its radios, so it
++// can follow a parent to another channel (see above). In a mesh that runs on
++// one channel that is needless and costly: every move of the backhaul - a
++// steer, a parent that reboots - took the fronthaul down for ~26 s
++// (2026-09-27, a leaf steered 16:05:28-54), although the new parent was on
++// the same channel and the backhaul can associate with the APs running.
++//
++// So a backhaul that WAS connected gets BH_GRACE_MS to find a parent with
++// the APs still up. Only if it has not reached COMPLETED by then are the APs
++// stopped, as before - the case of a parent on another channel, which the
++// radio cannot join while its APs hold the old one. A backhaul that has not
++// been connected yet (boot, first join) stops them at once, as before, and
++// APs that were never stopped are not restarted when it reconnects.
++const BH_GRACE_MS = 20000;
++
++// The "stop" half of iface_hostapd_notify, for the grace timer: the iface
++// object handed to a notification is not valid any more when the timer
++// fires (status() on it failed and nothing was sent, 2026-09-27), and a stop
++// needs no status anyway.
++function bh_stop_aps(ifname)
++{
++	let ubus = wpas.data.ubus;
++	let mld = wpas.data.mld[ifname];
++
++	if (!mld) {
++		let phy = wpas.data.iface_phy[ifname];
++		if (phy && !radio_has_connected_sta(phy, ifname))
++			ubus.call("hostapd", "apsta_state", { phy: phy, up: false });
++		return;
++	}
++
++	let radio_mask = mld.radio_mask;
++	for (let i = 0; radio_mask; i++, radio_mask >>= 1) {
++		if (!(radio_mask & 1) || radio_has_connected_sta(phy_name(mld.phy, i), ifname))
++			continue;
++		ubus.call("hostapd", "apsta_state", { phy: mld.phy, radio: i, up: false });
++	}
++}
++
++// true: the notification is handled here and must not reach hostapd
++function bh_grace(ifname, state, up)
++{
++	if (!wpas.data.bh[ifname])
++		wpas.data.bh[ifname] = { stopped: false, was_up: false, expired: false, timer: null };
++	let bh = wpas.data.bh[ifname];
++
++	if (up) {
++		if (bh.timer)
++			bh.timer.cancel();
++		bh.timer = null;
++		bh.expired = false;
++		if (state == "COMPLETED")
++			bh.was_up = true;
++		if (!bh.stopped) {
++			wpas.printf(`${ifname}: ${state}, APs were never stopped - nothing to restart`);
++			return true;
++		}
++		bh.stopped = false;
++		return false;
++	}
++
++	if (bh.was_up && !bh.expired) {
++		if (!bh.timer) {
++			wpas.printf(`${ifname}: ${state}, backhaul lost its parent - APs keep running for ${BH_GRACE_MS / 1000} s`);
++			bh.timer = uloop.timer(BH_GRACE_MS, () => {
++				bh.timer = null;
++				let cur = wpas.data.sta_state[ifname];
++				if (cur == null || cur == "COMPLETED")
++					return;
++				bh.expired = true;
++				bh.stopped = true;
++				wpas.printf(`${ifname}: no parent after ${BH_GRACE_MS / 1000} s (${cur}) - stopping the APs`);
++				bh_stop_aps(ifname);
++			});
++		}
++		return true;
++	}
++
++	bh.stopped = true;
++	return false;
++}
++
+ function iface_hostapd_notify(ifname, iface, state)
+ {
+ 	wpas.data.sta_state[ifname] = state;
+@@ -753,6 +836,9 @@
+ 		return;
+ 	}
+ 
++	if (sta_is_mesh_backhaul(ifname) && bh_grace(ifname, state, msg.up))
++		return;
++
+ 	if (!mld) {
+ 		msg.phy = wpas.data.iface_phy[ifname];
+ 		if (!msg.phy) {
+@@ -922,6 +1008,9 @@
+ 	},
+ 	iface_remove: function(name, obj) {
+ 		delete wpas.data.sta_state[name];
++		if (wpas.data.bh[name]?.timer)
++			wpas.data.bh[name].timer.cancel();
++		delete wpas.data.bh[name];
+ 		iface_event("remove", name);
+ 		iface_ubus_remove(name);
+ 	},

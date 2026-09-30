@@ -569,7 +569,10 @@ easymesh_setup_iopsys_feed() {
 	# tears it down on a silent tick, all-zero map = teardown (B03). HW
 	# 23. 9.: fresh policy in the radios in 4 s, fuse started and ended itself.
 	# predchozi pin 810df6cfe (relay: multicast duplicate check per origin)
-	local pin=${IOPSYS_PIN:-a7d9731a2}
+	# predchozi pin a7d9731a2 (map-agent: missed AP MLD station links). 30. 9.: ea52742a8
+	# drops the stray easymesh-trace hook that made 30-set-ieee1905-al-macaddr exit
+	# on line 2 every boot (random AL-MAC after firstboot instead of the efuse one).
+	local pin=${IOPSYS_PIN:-ea52742a8}
 	( cd "${EASYMESH_SHARED}/iopsys-feed" \
 	  && { git rev-parse --verify -q "${pin}^{commit}" >/dev/null 2>&1 || git fetch --all --tags; } \
 	  && git reset --hard "${pin}" && git clean -fd ) || {

@@ -42,7 +42,7 @@ RTWT_VOICE_ID=1     # Voice TIDs 6+7, mantissa=255, exponent=4096 → ~524ms int
 RTWT_VIDEO_ID=2     # Video TIDs 4+5, mantissa=128, exponent=2048 → ~262ms interval
 RTWT_CHECK_INTERVAL=6  # re-verify groups every N main loop iterations
 
-# Link → frequency mapping
+# Link → frequency mapping (fallbacks; refreshed from the running AP every loop)
 FREQ_L0=2462
 FREQ_L1=5180
 FREQ_L2=6135
@@ -55,6 +55,23 @@ log() {
     logger -t mlo-steerd "$*"
     local lines; lines=$(wc -l < "$LOG_FILE")
     [ "$lines" -gt "$LOG_MAX" ] && tail -n "$LOG_MAX" "$LOG_FILE" > "${LOG_FILE}.tmp" && mv "${LOG_FILE}.tmp" "$LOG_FILE"
+}
+
+# Refresh FREQ_L0..2 from the actual link channels (channel/ACS/DFS changes)
+update_link_freqs() {
+    local lid freq
+    while read -r lid freq; do
+        case "$lid" in
+            0) FREQ_L0=$freq ;;
+            1) FREQ_L1=$freq ;;
+            2) FREQ_L2=$freq ;;
+        esac
+    done <<EOF
+$(iw dev "$MLO_IF" info 2>/dev/null | awk '
+    /link ID/ { lid=$4 }
+    /channel/ && lid != "" { f=$3; gsub(/[^0-9]/, "", f); print lid, f; lid="" }
+')
+EOF
 }
 
 # Get noise floor (dBm) for a frequency
@@ -119,6 +136,16 @@ link_score() {
     local busy_score=$(( 100 - busy ))
     [ $busy_score -lt 0 ] && busy_score=0
     echo $(( snr_norm * 60 + ret_score * 30 + busy_score * 10 ))
+}
+
+# Remaining A-TTLM duration in ms, 0 if no A-TTLM is active.
+# hostapd refuses SET_ATTLM while one is active ("Busy: A-TTLM is on-going"),
+# so a new mapping can only be issued after the previous one expires.
+attlm_remaining_ms() {
+    hostapd_cli -i "$MLO_IF" get_attlm 2>/dev/null | awk '
+        /Remaining Expected Duration:/ { print $4 + 0; found=1 }
+        END { if (!found) print 0 }
+    '
 }
 
 # issue SET_ATTLM for given disabled_links bitmask
@@ -216,7 +243,7 @@ neg_ttlm_teardown() {
 
 # Check if R-TWT group id exists in current AP state
 btwt_exists() {
-    hostapd_cli -i "$MLO_IF" get_btwt 2>/dev/null | grep -q "btwt_id=$1 "
+    hostapd_cli -i "$MLO_IF" get_btwt 2>/dev/null | grep -q "^id=$1 "
 }
 
 # Create R-TWT groups if missing. First add_btwt call may timeout (known FW delay)
@@ -281,6 +308,7 @@ while true; do
     fi
 
     # Collect inputs
+    update_link_freqs
     N0=$(noise_at $FREQ_L0); N1=$(noise_at $FREQ_L1); N2=$(noise_at $FREQ_L2)
     R0=$(min_rssi 0);        R1=$(min_rssi 1);        R2=$(min_rssi 2)
     RET=$(retries_pct)
@@ -375,12 +403,23 @@ while true; do
     if [ "$MASK" -gt 0 ]; then
         for _mac in $NEG_TTLM_MACS; do neg_ttlm_teardown "$_mac"; done
         NEG_TTLM_MACS=""
-        attlm_set "$MASK"
+        # Re-arm right at expiry instead of every loop: avoids the refused
+        # "Busy" calls and the gap where disabled links briefly come back.
+        REMAIN=$(attlm_remaining_ms)
+        if [ "$REMAIN" -gt 0 ] && [ "$REMAIN" -lt $(( INTERVAL * 1000 )) ]; then
+            sleep $(( REMAIN / 1000 + 1 ))
+            REMAIN=$(attlm_remaining_ms)
+        fi
+        [ "$REMAIN" -eq 0 ] && attlm_set "$MASK"
         STATUS="ATTLM mask=$MASK | ret=${RET}% busy6G=${BUSY2}% busy5G=${BUSY1}%"
     else
         ACTIVE_MASK=7
         NEW_NEG_MACS=""
         for _mac in $MLMR_MACS; do
+            # Mapping is static while all links are up: send it once per client
+            case " $NEG_TTLM_MACS " in
+                *" $_mac "*) NEW_NEG_MACS="${NEW_NEG_MACS} ${_mac}"; continue ;;
+            esac
             neg_ttlm_set "$_mac" "$ACTIVE_MASK" && NEW_NEG_MACS="${NEW_NEG_MACS} ${_mac}"
         done
         NEG_TTLM_MACS="$NEW_NEG_MACS"

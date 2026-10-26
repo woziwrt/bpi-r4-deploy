@@ -1,6 +1,6 @@
 --- /dev/null	2026-06-03 07:32:46.481863000 +0200
 +++ b/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4-pro-8x.dts	2026-06-03 07:32:37.479298898 +0200
-@@ -0,0 +1,802 @@
+@@ -0,0 +1,861 @@
 +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
 +/*
 + * Copyright (C) 2022 MediaTek Inc.
@@ -663,6 +663,60 @@
 +		pinctrl-names = "default";
 +		pinctrl-0 = <&pwm0_pins>;
 +		status = "okay";
++	};
++};
++
++/*
++ * Fan speed follows the CPU temperature, as on the plain BPI-R4 (OpenWrt
++ * patches 035/180 put the same trips and maps in mt7988a-bananapi-bpi-r4.dtsi,
++ * which this board does not include). Without them the fan was registered but
++ * attached to no thermal zone and stayed at its boot duty.
++ */
++&cpu_thermal {
++	trips {
++		cpu_trip_hot: hot {
++			temperature = <120000>;
++			hysteresis = <2000>;
++			type = "hot";
++		};
++
++		cpu_trip_active_high: active-high {
++			temperature = <115000>;
++			hysteresis = <2000>;
++			type = "active";
++		};
++
++		cpu_trip_active_med: active-med {
++			temperature = <85000>;
++			hysteresis = <2000>;
++			type = "active";
++		};
++
++		cpu_trip_active_low: active-low {
++			temperature = <40000>;
++			hysteresis = <2000>;
++			type = "active";
++		};
++	};
++
++	cooling-maps {
++		map-cpu-active-high {
++			/* active: set fan to cooling level 3 (100% duty) */
++			cooling-device = <&fan 3 3>;
++			trip = <&cpu_trip_active_high>;
++		};
++
++		map-cpu-active-med {
++			/* active: set fan to cooling level 2 (50% duty) */
++			cooling-device = <&fan 2 2>;
++			trip = <&cpu_trip_active_med>;
++		};
++
++		map-cpu-active-low {
++			/* active: set fan to cooling level 1 (30% duty) */
++			cooling-device = <&fan 1 1>;
++			trip = <&cpu_trip_active_low>;
++		};
 +	};
 +};
 +

@@ -40,15 +40,19 @@ git clone --branch main https://github.com/mediatek/mtk-openwrt-feeds mtk-openwr
 # naseho by patch aplikovalo DVAKRAT a build by spadl.
 #\cp -r my_files/999-fix-00-xfrm-sw-sa-offload-ok.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 
-### tx_power check Ivan Mironov's patch - for defective BE14 boards with defective eeprom flash
-\cp -r my_files/100-wifi-mt76-mt7996-Use-tx_power-from-default-fw-if-EEP.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches
-
-### per-band WiFi LED (MT7996, single-wiphy MLO) + shared tpt trigger - HW verified 2026-06-28
-\cp -r my_files/999-wifi-01-mt7996-per-band-leds.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches/9999-w-mt7996-per-band-leds.patch
-\cp -r my_files/999-wifi-02-mt76-share-tpt-led-trigger.patch mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/25.12/files/package/kernel/mt76/patches/9999-w-mt76-share-tpt-led-trigger.patch
-
 cd openwrt
 bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic prepare
+
+# Wi-Fi: since MTK feed c21f3b36 mt76/mac80211/hostapd come from github.com/mediatek/softmac_*
+# and the feed has no patch directories for them any more. Pin the sources, then add our patches
+# straight into the packages.
+sh ../my_files/softmac-pin.sh
+mkdir -p package/kernel/mt76/patches package/kernel/mac80211/patches/subsys package/network/services/hostapd/patches
+### tx_power check Ivan Mironov's patch - for defective BE14 boards with defective eeprom flash
+\cp ../my_files/100-wifi-mt76-mt7996-Use-tx_power-from-default-fw-if-EEP.patch package/kernel/mt76/patches/
+### per-band WiFi LED (MT7996, single-wiphy MLO) + shared tpt trigger - HW verified 2026-06-28
+\cp ../my_files/999-wifi-01-mt7996-per-band-leds.patch package/kernel/mt76/patches/9999-w-mt7996-per-band-leds.patch
+\cp ../my_files/999-wifi-02-mt76-share-tpt-led-trigger.patch package/kernel/mt76/patches/9999-w-mt76-share-tpt-led-trigger.patch
 
 # platform.sh: register bpi-r4-pro-8x in fit_do_upgrade, fit_check_image, platform_copy_config
 python3 -c 'f="target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"; c=open(f).read(); c=c.replace("\tbananapi,bpi-r4-lite|\\\n\tbazis,ax3000wm","\tbananapi,bpi-r4-lite|\\\n\tbananapi,bpi-r4-pro-8x|\\\n\tbazis,ax3000wm"); c=c.replace("\tbananapi,bpi-r4-lite|\\\n\tcmcc,rax3000m","\tbananapi,bpi-r4-lite|\\\n\tbananapi,bpi-r4-pro-8x|\\\n\tcmcc,rax3000m"); open(f,"w").write(c)'

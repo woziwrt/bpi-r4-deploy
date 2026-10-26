@@ -279,7 +279,7 @@ Signed-off-by: Bo-Cun Chen <bc-bocun.chen@mediatek.com>
 @@ -5188,7 +5359,7 @@ static int mtk_sgmii_init(struct mtk_eth *eth)
  static int mtk_probe(struct platform_device *pdev)
  {
- 	struct resource *res = NULL, *res_sram;
+ 	struct resource *res = NULL;
 -	struct device_node *mac_np;
 +	struct device_node *mac_np, *mux_np;
  	struct mtk_eth *eth;

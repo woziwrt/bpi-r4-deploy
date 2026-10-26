@@ -1,39 +1,26 @@
 --- a/drivers/net/pcs/pcs-mtk-usxgmii.c
 +++ b/drivers/net/pcs/pcs-mtk-usxgmii.c
-@@ -357,11 +357,12 @@
- 	do {
+@@ -396,7 +396,8 @@
  		msleep(100);
-
--		if (mtk_usxgmii_pcs_link_status(mpcs) &&
+ 
+ 		if (mtk_usxgmii_pcs_link_status(mpcs) &&
 -		    mtk_usxgmii_pcs_is_valid_ctle(mpcs))
-+		if (mtk_usxgmii_pcs_link_status(mpcs) &&
 +		    (interface == PHY_INTERFACE_MODE_10GBASER ||
 +		     mtk_usxgmii_pcs_is_valid_ctle(mpcs)))
  			return;
-
+ 
  	} while (time_before(jiffies, t_start + msecs_to_jiffies(10000)));
-
- 	dev_warn(mpcs->dev, "wait link up timeout!\n");
- }
-@@ -374,16 +375,21 @@
- 	if ((mpcs->interface != PHY_INTERFACE_MODE_5GBASER &&
- 	     mpcs->interface != PHY_INTERFACE_MODE_10GBASER &&
- 	     mpcs->interface != PHY_INTERFACE_MODE_10GKR &&
- 	     mpcs->interface != PHY_INTERFACE_MODE_USXGMII) ||
+@@ -416,6 +417,13 @@
  	    (mpcs->poll == false))
  		goto exit;
-
+ 
 +	if (mpcs->interface == PHY_INTERFACE_MODE_10GBASER) {
 +		if (mtk_usxgmii_pcs_link_status(mpcs))
 +			mtk_usxgmii_pcs_update_state(mpcs);
++		else
++			mpcs->state.link = false;
 +		goto exit;
 +	}
- 	if (mtk_usxgmii_pcs_link_status(mpcs) && mtk_usxgmii_pcs_is_valid_ctle(mpcs))
+ 	if (mtk_usxgmii_pcs_link_status(mpcs) && mtk_usxgmii_pcs_is_valid_ctle(mpcs)) {
  		mtk_usxgmii_pcs_update_state(mpcs);
- 	else
- 		mtk_usxgmii_pcs_config(&mpcs->pcs, mpcs->neg_mode,
- 				       mpcs->interface, NULL, false);
-
- exit:
- 	if (!delayed_work_pending(&mpcs->link_poll))
- 		schedule_delayed_work(&mpcs->link_poll, msecs_to_jiffies(1000));
+ 	} else {

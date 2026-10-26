@@ -6,8 +6,8 @@ set -euo pipefail
 #   MTK SDK:  822c2f0603614e47ec8496571043431494fd2841  (MAIN HEAD; git01 mrazi -> MTK doporucil main)
 
 # BUMP 2026-09-16 (predchozi: OpenWrt 4a5c6b90d2 / MTK 4e825214de, oboje 18. 8.):
-#   OpenWrt:  9facdff6fb001b7a4e8cea395b89278fd49ca92f  (openwrt-25.12 HEAD, 15. 9.)
-#   MTK SDK:  e55f4f30d66b2a99c5a1b75bdc2f22bf6c756243  (github main, 16. 9.)
+#   OpenWrt:  f3f5c2e54bf432b444e36b1a77077ff476361825  (openwrt-25.12 HEAD, 15. 9.)
+#   MTK SDK:  c21f3b3617be249a1408a5e9daa66d402dd555bb  (github main, 16. 9.)
 #
 # Kernel jde .103 -> .108. Oba piny MUSI jit spolu: MTK patche jsou rebasovane
 # na kernel a bump na .105 posunul kontext v mtk_eth_soc, kam sahaji 999-eth-*.
@@ -24,10 +24,10 @@ rm -rf openwrt
 rm -rf mtk-openwrt-feeds
 
 git clone --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt
-cd openwrt; git checkout ${OPENWRT_COMMIT:-9facdff6fb001b7a4e8cea395b89278fd49ca92f}; cd -;
+cd openwrt; git checkout ${OPENWRT_COMMIT:-f3f5c2e54bf432b444e36b1a77077ff476361825}; cd -;
 
 git clone --branch main https://github.com/mediatek/mtk-openwrt-feeds mtk-openwrt-feeds
-( cd mtk-openwrt-feeds && git checkout ${MTK_COMMIT:-e55f4f30d66b2a99c5a1b75bdc2f22bf6c756243} )
+( cd mtk-openwrt-feeds && git checkout ${MTK_COMMIT:-c21f3b3617be249a1408a5e9daa66d402dd555bb} )
 
 \cp -r my_files/999-sfp-10-additional-quirks.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12
 \cp -r my_files/999-sfp-11-rtl8261be-mdio-none.patch mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12

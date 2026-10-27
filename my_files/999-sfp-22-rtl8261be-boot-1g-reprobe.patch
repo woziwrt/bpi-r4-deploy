@@ -4,17 +4,17 @@
  #define T_PROBE_RETRY_SLOW	msecs_to_jiffies(5000)
  #define R_PROBE_RETRY_SLOW	12
  
-+/* T_LINK_FAIL: how long we wait for a stable link after selecting the host
-+ * interface before re-reading the module. Some active copper SFP+ modules
-+ * (e.g. RTL8261BE based) advertise 10GBASE-T at power-on and only switch to
-+ * 1000BASE-T once they have locked a 1G link partner; if the host probed them
-+ * while they still advertised 10G it stays stuck on 10GBASE-R and never links.
-+ * Re-reading the module picks up the changed advertisement. T_LINK_STABLE is
-+ * how long the link must stay up to be considered good. R_REPROBE bounds the
-+ * number of re-read attempts.
++/* Some PHY-less copper SFP+ modules (e.g. RTL8261BE based) advertise
++ * 10GBASE-T at power-on and only switch to 1000BASE-T once they have locked
++ * a 1G link partner (or the other way round after a cable change). If the
++ * host picked its interface from the old advertisement it stays on the wrong
++ * one and the host link never comes up, although the module reports signal.
++ * T_LINK_FAIL after the module reports signal we check the host link and, if
++ * it is still down, re-read the module to pick up its current advertisement.
++ * R_REPROBE bounds the number of re-reads; the budget is renewed only after
++ * a host link has been seen.
 + */
 +#define T_LINK_FAIL		msecs_to_jiffies(15000)
-+#define T_LINK_STABLE		msecs_to_jiffies(5000)
 +#define R_REPROBE		20
 +
  /* SFP modules appear to always have their PHY configured for bus address
@@ -28,25 +28,28 @@
  	struct mutex sm_mutex;			/* Protects state machine */
  	unsigned char sm_mod_state;
  	unsigned char sm_mod_tries_init;
-@@ -270,6 +284,8 @@
+@@ -270,6 +284,9 @@
  	unsigned short sm_state;
  	unsigned char sm_fault_retries;
  	unsigned char sm_phy_retries;
 +	unsigned char sm_reprobe_tries;
 +	bool sm_reprobing;
++	bool sm_link_ok;
  
  	struct sfp_eeprom_id id;
  	unsigned int module_power_mW;
-@@ -1976,7 +1992,7 @@
- static void sfp_sm_link_up(struct sfp *sfp)
+@@ -1896,6 +1913,10 @@
  {
  	sfp_link_up(sfp->sfp_bus);
--	sfp_sm_next(sfp, SFP_S_LINK_UP, 0);
-+	sfp_sm_next(sfp, SFP_S_LINK_UP, T_LINK_STABLE);
+ 	sfp_sm_next(sfp, SFP_S_LINK_UP, 0);
++
++	/* A module with a PHY is handled by its PHY driver. */
++	if (!sfp->mod_phy && sfp->sm_reprobe_tries)
++		mod_delayed_work(system_wq, &sfp->reprobe, T_LINK_FAIL);
  }
  
  static void sfp_sm_link_down(struct sfp *sfp)
-@@ -2598,6 +2614,8 @@
+@@ -2494,6 +2515,8 @@
  
  	/* Handle remove event globally, it resets this state machine */
  	if (event == SFP_E_REMOVE) {
@@ -55,73 +58,99 @@
  		sfp_sm_mod_remove(sfp);
  		sfp_sm_mod_next(sfp, SFP_MOD_EMPTY, 0);
  		return;
-@@ -2619,6 +2637,9 @@
+@@ -2515,6 +2538,10 @@
  			sfp_sm_mod_next(sfp, SFP_MOD_PROBE, T_SERIAL);
  			sfp->sm_mod_tries_init = R_PROBE_RETRY_INIT;
  			sfp->sm_mod_tries = R_PROBE_RETRY_SLOW;
 +			if (!sfp->sm_reprobing)
 +				sfp->sm_reprobe_tries = R_REPROBE;
 +			sfp->sm_reprobing = false;
++			sfp->sm_link_ok = false;
  		}
  		break;
  
-@@ -2831,6 +2852,12 @@
- 			sfp_sm_next(sfp, SFP_S_FAIL, 0);
- 			break;
- 		}
-+		/* Arm the re-probe watchdog: if the link does not become
-+		 * stable within T_LINK_FAIL, re-read the module in case it
-+		 * changed its advertised capabilities.
-+		 */
-+		if (sfp->sm_reprobe_tries)
-+			mod_delayed_work(system_wq, &sfp->reprobe, T_LINK_FAIL);
- 		sfp_sm_link_check_los(sfp);
- 
- 		/* Reset the fault retry count */
-@@ -2852,7 +2879,12 @@
- 		break;
+@@ -2749,9 +2776,18 @@
  
  	case SFP_S_LINK_UP:
--		if (event == SFP_E_TX_FAULT) {
-+		if (event == SFP_E_TIMEOUT) {
-+			/* Link has stayed up for T_LINK_STABLE: the module is
-+			 * happy with the selected interface, stop the watchdog.
-+			 */
+ 		if (event == SFP_E_TX_FAULT) {
 +			cancel_delayed_work(&sfp->reprobe);
-+		} else if (event == SFP_E_TX_FAULT) {
  			sfp_sm_link_down(sfp);
  			sfp_sm_fault(sfp, SFP_S_TX_FAULT, true);
  		} else if (sfp_los_event_active(sfp, event)) {
-@@ -3097,6 +3129,28 @@
++			cancel_delayed_work(&sfp->reprobe);
++			/* A cable change after a good link (e.g. 1G to 10G)
++			 * may need a re-read again: renew the budget.
++			 */
++			if (sfp->sm_link_ok) {
++				sfp->sm_link_ok = false;
++				sfp->sm_reprobe_tries = R_REPROBE;
++			}
+ 			sfp_sm_link_down(sfp);
+ 			sfp_sm_next(sfp, SFP_S_WAIT_LOS, 0);
+ 		}
+@@ -2993,6 +3029,61 @@
  		mod_delayed_work(system_wq, &sfp->poll, poll_jiffies);
  }
  
++static struct net_device *sfp_upstream_netdev(struct sfp *sfp)
++{
++	struct net_device *ndev;
++
++	ASSERT_RTNL();
++
++	if (!sfp->sfp_bus)
++		return NULL;
++
++	for_each_netdev(&init_net, ndev)
++		if (ndev->sfp_bus == sfp->sfp_bus)
++			return ndev;
++
++	return NULL;
++}
++
 +static void sfp_reprobe(struct work_struct *work)
 +{
 +	struct sfp *sfp = container_of(work, struct sfp, reprobe.work);
++	struct net_device *ndev;
 +
-+	if (!sfp->sm_reprobe_tries)
-+		return;
++	rtnl_lock();
++	mutex_lock(&sfp->sm_mutex);
++
++	/* Signal lost meanwhile: the LOS handling re-arms us. */
++	if (sfp->sm_state != SFP_S_LINK_UP || !sfp->sm_reprobe_tries)
++		goto unlock;
++
++	/* The module reports signal; only the host link tells whether the
++	 * selected interface matches what the module speaks now. Without a
++	 * netdev to ask, leave the module alone.
++	 */
++	ndev = sfp_upstream_netdev(sfp);
++	if (!ndev || netif_carrier_ok(ndev)) {
++		sfp->sm_link_ok = true;
++		goto unlock;
++	}
 +
 +	sfp->sm_reprobe_tries--;
 +	dev_info(sfp->dev,
-+		 "link not established, re-reading module (%u tries left)\n",
-+		 sfp->sm_reprobe_tries);
++		 "%s: no link, re-reading module (%u tries left)\n",
++		 netdev_name(ndev), sfp->sm_reprobe_tries);
 +
 +	/* Replicate a physical remove/insert so the module is re-read and the
 +	 * upstream interface is re-selected from its current advertisement.
-+	 * Runs in process context without sm_mutex held, so taking it via
-+	 * sfp_sm_event() is safe.
 +	 */
 +	sfp->sm_reprobing = true;
-+	sfp_sm_event(sfp, SFP_E_REMOVE);
-+	sfp_sm_event(sfp, SFP_E_INSERT);
++	__sfp_sm_event(sfp, SFP_E_REMOVE);
++	__sfp_sm_event(sfp, SFP_E_INSERT);
++
++unlock:
++	mutex_unlock(&sfp->sm_mutex);
++	rtnl_unlock();
 +}
 +
  static struct sfp *sfp_alloc(struct device *dev)
  {
  	struct sfp *sfp;
-@@ -3112,6 +3166,7 @@
+@@ -3008,6 +3099,7 @@
  	mutex_init(&sfp->st_mutex);
  	INIT_DELAYED_WORK(&sfp->poll, sfp_poll);
  	INIT_DELAYED_WORK(&sfp->timeout, sfp_timeout);
@@ -129,7 +158,7 @@
  
  	sfp_hwmon_init(sfp);
  
-@@ -3126,6 +3181,7 @@
+@@ -3022,6 +3114,7 @@
  
  	cancel_delayed_work_sync(&sfp->poll);
  	cancel_delayed_work_sync(&sfp->timeout);
@@ -137,7 +166,7 @@
  	if (sfp->i2c_mii) {
  		mdiobus_unregister(sfp->i2c_mii);
  		mdiobus_free(sfp->i2c_mii);
-@@ -3311,6 +3367,7 @@
+@@ -3207,6 +3300,7 @@
  
  	cancel_delayed_work_sync(&sfp->poll);
  	cancel_delayed_work_sync(&sfp->timeout);

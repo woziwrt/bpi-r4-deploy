@@ -1,0 +1,5 @@
+#!/bin/sh
+# The MTK feed is built into the image but has no repository on
+# downloads.openwrt.org, so its line in distfeeds.list makes apk update fail.
+sed -i '/\/mtk_openwrt_feed\//d' /etc/apk/repositories.d/distfeeds.list 2>/dev/null
+exit 0

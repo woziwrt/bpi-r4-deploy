@@ -88,6 +88,8 @@ python3 -c 'content=open("target/linux/mediatek/filogic/config-6.12").read(); co
 mkdir -p files/etc/uci-defaults
 \cp -r ../my_files/99-set-hostname files/etc/uci-defaults/
 chmod +x files/etc/uci-defaults/99-set-hostname
+\cp ../my_files/etc-files/uci-defaults/97-distfeeds-drop-mtk-feed files/etc/uci-defaults/
+chmod +x files/etc/uci-defaults/97-distfeeds-drop-mtk-feed
 \cp -r ../my_files/99-pro-8x-network files/etc/uci-defaults/
 chmod +x files/etc/uci-defaults/99-pro-8x-network
 

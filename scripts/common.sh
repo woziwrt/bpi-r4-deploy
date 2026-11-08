@@ -12,12 +12,21 @@ load_pins() {
 }
 
 fetch_sources() {
-	rm -rf openwrt mtk-openwrt-feeds
-
-	git clone --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt
+	if [ ! -d openwrt ]; then
+		git clone --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt
+	else
+		git -C openwrt reset --hard HEAD
+		# Keep downloaded sources; remove nested feed repositories and all build state.
+		git -C openwrt clean -dffx -e /dl/
+	fi
 	git -C openwrt checkout "$OPENWRT_COMMIT"
 
-	git clone --branch main https://github.com/mediatek/mtk-openwrt-feeds mtk-openwrt-feeds
+	if [ ! -d mtk-openwrt-feeds ]; then
+		git clone --branch main https://github.com/mediatek/mtk-openwrt-feeds mtk-openwrt-feeds
+	else
+	    git -C mtk-openwrt-feeds reset --hard HEAD
+	    git -C mtk-openwrt-feeds clean -dffx
+	fi
 	git -C mtk-openwrt-feeds checkout "$MTK_COMMIT"
 }
 

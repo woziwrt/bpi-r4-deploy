@@ -76,11 +76,6 @@ add_files() {
 }
 
 add_after_feeds() {
-	local p
-	for p in "$REPO/boards/$BOARD"/patches/after-feeds/*.patch; do
-		patch -p1 < "$p"
-	done
-
 	\cp -r "$REPO/common/qmi.sh" package/network/utils/uqmi/files/lib/netifd/proto/
 	chmod -R 755 package/network/utils/uqmi/files/lib/netifd/proto
 	chmod -R 755 feeds/luci/applications/luci-app-modemdata/root

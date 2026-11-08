@@ -473,9 +473,10 @@ The images end up in `openwrt/bin/targets/mediatek/filogic/`.
 ### Board source patches
 
 Shared build-tree patches live in `common/patches/build/`, with board-specific
-patches in `boards/<board>/patches/build/`.
-Patches in `boards/<board>/patches/after-feeds/` are applied after feed installation.
-When updating `pins.conf`, rebase build and after-feeds patches against the sources after MediaTek preparation.
+patches in `boards/<board>/patches/build/`. All are applied after MediaTek
+preparation, before the final feed update and installation.
+When updating `pins.conf`, rebase these patches against the sources after
+MediaTek preparation.
 
 ## Architecture
 

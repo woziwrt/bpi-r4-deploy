@@ -8,7 +8,7 @@ WIFI_PATCHES="
 "
 
 board_tree() {
-	local b=$REPO/boards/bpi-r4-pro-8x
+	local b=$REPO/boards/bpi-r4-pro-8x p
 
 	# platform.sh: register bpi-r4-pro-8x in fit_do_upgrade, fit_check_image, platform_copy_config
 	python3 -c 'f="target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"; c=open(f).read(); c=c.replace("\tbananapi,bpi-r4-lite|\\\n\tbazis,ax3000wm","\tbananapi,bpi-r4-lite|\\\n\tbananapi,bpi-r4-pro-8x|\\\n\tbazis,ax3000wm"); c=c.replace("\tbananapi,bpi-r4-lite|\\\n\tcmcc,rax3000m","\tbananapi,bpi-r4-lite|\\\n\tbananapi,bpi-r4-pro-8x|\\\n\tcmcc,rax3000m"); open(f,"w").write(c)'
@@ -28,10 +28,9 @@ board_tree() {
 	rm -f target/linux/mediatek/patches-6.12/046-v6.19-arm64-dts-mediatek-mt7988a-bpi-r4-pro-add-dts.patch
 	\cp "$b"/patches/target/*.patch target/linux/mediatek/patches-6.12/
 
-	\cp "$b/uboot-mediatek-Makefile" package/boot/uboot-mediatek/Makefile
-	\cp "$b/arm-trusted-firmware-mediatek-Makefile" package/boot/arm-trusted-firmware-mediatek/Makefile
-	\cp "$b/filogic.mk" target/linux/mediatek/image/filogic.mk
-	mv target/linux/mediatek/image/filogic-extra.mk target/linux/mediatek/image/filogic-extra.mk.disabled
+	for p in "$b"/patches/build/*.patch; do
+		patch -p1 < "$p"
+	done
 
 	echo "CONFIG_BLK_DEV_NVME=y" >> target/linux/mediatek/filogic/config-6.12
 	echo "CONFIG_TASK_IO_ACCOUNTING=y" >> target/linux/mediatek/filogic/config-6.12

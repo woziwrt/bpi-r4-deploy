@@ -1,0 +1,105 @@
+--- a/target/linux/mediatek/image/filogic.mk
++++ b/target/linux/mediatek/image/filogic.mk
+@@ -81,6 +81,15 @@
+ 	rm $@.tmp
+ endef
+ 
++define Build/mt798x-gpt-nvme
++	cp $@ $@.tmp 2>/dev/null || true
++	ptgen -g -o $@.tmp -a 1 -l 1024 \
++			-t 0x83 -N boot		-r	-p 63M@1M \
++			-t 0x2e -N production		-p $(CONFIG_TARGET_ROOTFS_PARTSIZE)M@64M
++	cat $@.tmp >> $@
++	rm $@.tmp
++endef
++
+ # Variation of the normal partition table to account
+ # for factory and mfgdata partition
+ #
+@@ -706,6 +715,86 @@
+ 
+ endef
+ 
++define Device/bananapi_bpi-r4-pro-8x-common
++  DEVICE_VENDOR := Bananapi
++  DEVICE_DTS_DIR := $(DTS_DIR)/
++  DEVICE_DTS_LOADADDR := 0x45f00000
++  DEVICE_DTS_OVERLAY:= \
++mt7988a-bananapi-bpi-r4-emmc \
++mt7988a-bananapi-bpi-r4-rtc \
++mt7988a-bananapi-bpi-r4-sd \
++mt7988a-bananapi-bpi-r4-spim-nand \
++mt7988a-bananapi-bpi-r4-spim-nand-nmbm \
++mt7988a-bananapi-bpi-r4-nvme
++  DEVICE_DTC_FLAGS := --pad 4096
++  DEVICE_PACKAGES := kmod-hwmon-pwmfan kmod-i2c-mux-pca954x kmod-eeprom-at24 \
++    kmod-rtc-pcf8563 kmod-sfp kmod-phy-aquantia kmod-usb3 e2fsprogs f2fsck mkf2fs mt7988-wo-firmware
++  DEVICE_COMPAT_VERSION := 1.1
++  DEVICE_COMPAT_MESSAGE := The non-switch ports were renamed to match the board/case labels
++  KERNEL_LOADADDR := 0x46000000
++
++  ARTIFACTS := \
++      emmc-gpt.bin emmc-preloader.bin emmc-bl31-uboot.fip \
++      emmc-img.bin \
++      nvme-img.bin \
++      sdcard.img.gz \
++      snand-preloader.bin snand-bl31-uboot.fip \
++      snand-img.bin
++  ARTIFACT/emmc-gpt.bin := mt798x-gpt emmc
++  ARTIFACT/emmc-preloader.bin := mt7988-bl2 emmc-comb-4bg
++  ARTIFACT/emmc-bl31-uboot.fip := mt7988-bl31-uboot $$(DEVICE_NAME)-emmc
++  ARTIFACT/emmc-img.bin := mt798x-gpt emmc | \
++  pad-to 17k | mt7988-bl2 emmc-comb-4bg | \
++  pad-to 6656k | mt7988-bl31-uboot $$(DEVICE_NAME)-emmc | \
++  pad-to 64M | append-image squashfs-sysupgrade.itb
++  ARTIFACT/nvme-img.bin := mt798x-gpt-nvme | \
++  pad-to 512M | append-image squashfs-sysupgrade.itb
++  ARTIFACT/snand-preloader.bin := mt7988-bl2 spim-nand-ubi-comb-4bg
++  ARTIFACT/snand-bl31-uboot.fip := mt7988-bl31-uboot $$(DEVICE_NAME)-snand
++  ARTIFACT/snand-img.bin := mt7988-bl2 spim-nand-ubi-comb-4bg | \
++  pad-to 6144k | \
++  ubinize-image fit squashfs-sysupgrade.itb
++  ARTIFACT/sdcard.img.gz := mt798x-gpt sdmmc |\
++  pad-to 17k | mt7988-bl2 sdmmc-comb-4bg |\
++  pad-to 6656k | mt7988-bl31-uboot $$(DEVICE_NAME)-sdmmc |\
++  pad-to 44M | mt7988-bl2 spim-nand-ubi-comb-4bg |\
++  pad-to 45M | mt7988-bl31-uboot $$(DEVICE_NAME)-snand |\
++  pad-to 51M | mt7988-bl2 emmc-comb-4bg |\
++  pad-to 52M | mt7988-bl31-uboot $$(DEVICE_NAME)-emmc |\
++  pad-to 56M | mt798x-gpt emmc |\
++$(if $(CONFIG_TARGET_ROOTFS_SQUASHFS),\
++  pad-to 64M | append-image squashfs-sysupgrade.itb | check-size |\
++) \
++  gzip
++
++  KERNEL := kernel-bin | gzip
++  KERNEL_INITRAMFS := kernel-bin | lzma | \
++fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
++  IMAGES := sysupgrade.itb
++
++  IMAGES := sysupgrade.itb
++  IMAGE/sysupgrade.itb := append-kernel | fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-with-rootfs | pad-rootfs | append-metadata
++ifeq ($(DUMP),)
++  IMAGE_SIZE := $$(shell expr 64 + $$(CONFIG_TARGET_ROOTFS_PARTSIZE))m
++endif
++
++  BLOCKSIZE := 128k
++  PAGESIZE := 2048
++  UBOOTENV_IN_UBI := 1
++  UBINIZE_PARTS := fip=:$(STAGING_DIR_IMAGE)/mt7988_bananapi_bpi-r4-snand-u-boot.fip
++
++endef
++
++define Device/bananapi_bpi-r4-pro-8x
++  DEVICE_MODEL := BPi-R4-Pro-8X
++  DEVICE_DTS := mt7988a-bananapi-bpi-r4-pro-8x
++  DEVICE_DTS_CONFIG := config-mt7988a-bananapi-bpi-r4-pro-8x
++  $(call Device/bananapi_bpi-r4-pro-8x-common)
++  DEVICE_DTS_OVERLAY := mt7988a-bananapi-bpi-r4-pro-8x-emmc mt7988a-bananapi-bpi-r4-pro-8x-sd mt7988a-bananapi-bpi-r4-pro-8x-nvme-ssd2 mt7988a-bananapi-bpi-r4-pro-8x-wifi-mt7996a
++  UBINIZE_PARTS := fip=:$(STAGING_DIR_IMAGE)/mt7988_bananapi_bpi-r4-pro-8x-snand-u-boot.fip
++endef
++TARGET_DEVICES += bananapi_bpi-r4-pro-8x
++
+ define Device/bananapi_bpi-r4
+   DEVICE_MODEL := BPi-R4
+   DEVICE_DTS := mt7988a-bananapi-bpi-r4

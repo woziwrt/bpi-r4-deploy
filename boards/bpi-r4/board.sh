@@ -11,18 +11,18 @@ WIFI_PATCHES="
 "
 
 board_tree() {
-	local b=$REPO/boards/bpi-r4
+	local b=$REPO/boards/bpi-r4 p
 
 	add_common_tree_patches
+	for p in "$b"/patches/build/*.patch; do
+		patch -p1 < "$p"
+	done
 	\cp "$b"/patches/uboot/*.patch package/boot/uboot-mediatek/patches/
 	\cp "$b"/patches/target/*.patch target/linux/mediatek/patches-6.12/
-	\cp "$b/filogic.mk" target/linux/mediatek/image/filogic.mk
 
 	# Ethernet/board LEDs: leds overlay on top of the NVMe one, PHY LED trigger
 	sed -i 's/mt7988a-bananapi-bpi-r4-nvme$/mt7988a-bananapi-bpi-r4-nvme mt7988a-bananapi-bpi-r4-leds/' target/linux/mediatek/image/filogic.mk
 	echo "CONFIG_LED_TRIGGER_PHY=y" >> target/linux/mediatek/filogic/config-6.12
-
-	\cp "$b/arm-trusted-firmware-mediatek-Makefile" package/boot/arm-trusted-firmware-mediatek/Makefile
 
 	echo "CONFIG_BLK_DEV_NVME=y" >> target/linux/mediatek/filogic/config-6.12
 	[ "$VARIANT" = wired ] && echo "CONFIG_TASK_IO_ACCOUNTING=y" >> target/linux/mediatek/filogic/config-6.12

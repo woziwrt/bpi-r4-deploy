@@ -450,7 +450,7 @@ Both boards are built by one script:
 | `scripts/common.sh` | Build steps shared by both boards |
 | `common/` | Patches, packages and image files both boards use |
 | `boards/<board>/board.sh` | What only that board does |
-| `boards/<board>/` | Its patches, `filogic.mk`, U-Boot/TF-A Makefiles, image files (`files/`, installers in `files/root/install-dir/`), `configs/<variant>.config`, UniFi scripts (`unifi/`) |
+| `boards/<board>/` | Its source patches, image files (`files/`, installers in `files/root/install-dir/`), `configs/<variant>.config`, UniFi scripts (`unifi/`) |
 
 To change what is in the image, edit `boards/<board>/configs/<variant>.config`; to add files to the image, put them under `common/files/` (both boards) or `boards/<board>/files/`.
 
@@ -469,6 +469,13 @@ cd bpi-r4-deploy
 The images end up in `openwrt/bin/targets/mediatek/filogic/`.
 
 ---
+
+### Board source patches
+
+Shared build-tree patches live in `common/patches/build/`, with board-specific
+patches in `boards/<board>/patches/build/`.
+Patches in `boards/<board>/patches/after-feeds/` are applied after feed installation.
+When updating `pins.conf`, rebase build and after-feeds patches against the sources after MediaTek preparation.
 
 ## Architecture
 

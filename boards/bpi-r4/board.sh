@@ -11,9 +11,13 @@ WIFI_PATCHES="
 "
 
 board_tree() {
-	local b=$REPO/boards/bpi-r4
+	local b=$REPO/boards/bpi-r4 p
 
 	add_common_tree_patches
+	for p in "$b"/patches/build/*.patch; do
+		[ -f "$p" ] || continue
+		patch --batch -p1 < "$p"
+	done
 	\cp "$b"/patches/uboot/*.patch package/boot/uboot-mediatek/patches/
 	\cp "$b"/patches/target/*.patch target/linux/mediatek/patches-6.12/
 	\cp "$b/filogic.mk" target/linux/mediatek/image/filogic.mk

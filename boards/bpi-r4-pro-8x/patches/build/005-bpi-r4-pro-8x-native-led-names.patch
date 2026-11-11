@@ -1,0 +1,18 @@
+# The wired MT7988 switch port is PHY0, exposed as eth3 by the unlabeled
+# DSA port. The DTS names its green LED "lan"; MediaTek's module rename
+# makes the MDIO bus mt7530_dsa-0, as on the original R4.
+# Keep the MaxLinear and Aeonsemi LEDs on their driver/firmware defaults.
+# This adds new defaults; preserved /etc/config/system needs a manual update.
+
+--- a/target/linux/mediatek/filogic/base-files/etc/board.d/01_leds
++++ b/target/linux/mediatek/filogic/base-files/etc/board.d/01_leds
+@@ -59,6 +59,9 @@
+ 	ucidef_set_led_netdev "lan2" "lan2" "mt7530-0:02:green:lan" "lan2" "link tx rx"
+ 	ucidef_set_led_netdev "lan3" "lan3" "mt7530-0:03:green:lan" "lan3" "link tx rx"
+ 	;;
++bananapi,bpi-r4-pro-8x)
++	ucidef_set_led_netdev "lan_gbe" "LAN (1G)" "mt7530_dsa-0:00:green:lan" "eth3" "link tx rx"
++	;;
+ bananapi,bpi-r4-lite)
+ 	ucidef_set_led_netdev "sfp0" "sfp0" "green:sfp" "sfp0" "link tx rx"
+ 	;;

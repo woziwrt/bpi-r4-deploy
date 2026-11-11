@@ -49,7 +49,7 @@ add_wifi_patches() {
 }
 
 # Patches both boards take from common/patches: the U-Boot NVMe/NAND/MMC
-# support and the NVMe DT overlay and fitblk boot.
+# support, the NVMe DT overlay and fitblk boot, and the Aeonsemi PHY guard.
 add_common_tree_patches() {
 	\cp "$REPO"/common/patches/uboot/*.patch package/boot/uboot-mediatek/patches/
 	\cp "$REPO"/common/patches/target/*.patch target/linux/mediatek/patches-6.12/

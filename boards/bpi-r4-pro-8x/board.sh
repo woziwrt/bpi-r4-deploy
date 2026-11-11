@@ -8,12 +8,16 @@ WIFI_PATCHES="
 "
 
 board_tree() {
-	local b=$REPO/boards/bpi-r4-pro-8x
+	local b=$REPO/boards/bpi-r4-pro-8x p
 
 	# platform.sh: register bpi-r4-pro-8x in fit_do_upgrade, fit_check_image, platform_copy_config
 	python3 -c 'f="target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh"; c=open(f).read(); c=c.replace("\tbananapi,bpi-r4-lite|\\\n\tbazis,ax3000wm","\tbananapi,bpi-r4-lite|\\\n\tbananapi,bpi-r4-pro-8x|\\\n\tbazis,ax3000wm"); c=c.replace("\tbananapi,bpi-r4-lite|\\\n\tcmcc,rax3000m","\tbananapi,bpi-r4-lite|\\\n\tbananapi,bpi-r4-pro-8x|\\\n\tcmcc,rax3000m"); open(f,"w").write(c)'
 
 	add_common_tree_patches
+	for p in "$b"/patches/build/*.patch; do
+		[ -f "$p" ] || continue
+		patch --batch -p1 < "$p"
+	done
 	\cp "$b"/patches/uboot/*.patch package/boot/uboot-mediatek/patches/
 
 	# MTK feed patches superseded by ours:

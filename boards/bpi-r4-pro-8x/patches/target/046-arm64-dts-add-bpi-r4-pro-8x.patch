@@ -1,6 +1,6 @@
 --- /dev/null	2026-06-03 07:32:46.481863000 +0200
 +++ b/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4-pro-8x.dts	2026-06-03 07:32:37.479298898 +0200
-@@ -0,0 +1,861 @@
+@@ -0,0 +1,862 @@
 +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
 +/*
 + * Copyright (C) 2022 MediaTek Inc.
@@ -397,6 +397,7 @@
 +
 +&gsw_phy0_led0 {
 +	status = "okay";
++	function = LED_FUNCTION_LAN;
 +	color = <LED_COLOR_ID_GREEN>;
 +};
 +

@@ -1,0 +1,17 @@
+Subject: [PATCH] net: phy: mxl-gpy: register the MxL862xx hwmon chip info
+
+MTK's 999-ephy-gpy211-add-mxl862xx-integrated-phy.patch assigns
+mxl862xx_hwmon_chip_info to 'info' in gpy_hwmon_register() and then
+registers gpy_hwmon_chip_info. Pass 'info'.
+
+--- a/drivers/net/phy/mxl-gpy.c
++++ b/drivers/net/phy/mxl-gpy.c
+@@ -251,7 +251,7 @@ static int gpy_hwmon_register(struct phy
+
+ 	hwmon_dev = devm_hwmon_device_register_with_info(dev, hwmon_name,
+ 							 phydev,
+-							 &gpy_hwmon_chip_info,
++							 info,
+ 							 NULL);
+
+ 	return PTR_ERR_OR_ZERO(hwmon_dev);

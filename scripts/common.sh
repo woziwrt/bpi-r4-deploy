@@ -12,20 +12,25 @@ load_pins() {
 }
 
 fetch_sources() {
-	if [ ! -d openwrt ]; then
+	if [ ! -d openwrt/.git ]; then
+        rm -rf openwrt
 		git clone --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt
 	else
 		git -C openwrt reset --hard HEAD
 		# Keep downloaded sources; remove nested feed repositories and all build state.
-		git -C openwrt clean -dffx -e /dl/
+		git -C openwrt clean -dffx -e /dl
+	    # Fetch the commit if pin has changed
+	    git -C openwrt cat-file -e "$OPENWRT_COMMIT^{commit}" 2>/dev/null || git -C openwrt fetch origin
 	fi
 	git -C openwrt checkout "$OPENWRT_COMMIT"
 
-	if [ ! -d mtk-openwrt-feeds ]; then
+	if [ ! -d mtk-openwrt-feeds/.git ]; then
+        rm -rf mtk-openwrt-feeds
 		git clone --branch main https://github.com/mediatek/mtk-openwrt-feeds mtk-openwrt-feeds
 	else
-	    git -C mtk-openwrt-feeds reset --hard HEAD
-	    git -C mtk-openwrt-feeds clean -dffx
+		git -C mtk-openwrt-feeds reset --hard HEAD
+		git -C mtk-openwrt-feeds clean -dffx
+	    git -C mtk-openwrt-feeds -e "$MTK_COMMIT^{commit}" 2>/dev/null || git -C mtk-openwrt-feeds fetch origin
 	fi
 	git -C mtk-openwrt-feeds checkout "$MTK_COMMIT"
 }

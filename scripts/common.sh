@@ -11,28 +11,29 @@ load_pins() {
 	done < "$1"
 }
 
-fetch_sources() {
-	if [ ! -d openwrt/.git ]; then
-        rm -rf openwrt
-		git clone --branch openwrt-25.12 https://github.com/openwrt/openwrt.git openwrt
-	else
-		git -C openwrt reset --hard HEAD
-		# Keep downloaded sources; remove nested feed repositories and all build state.
-		git -C openwrt clean -dffx -e /dl
-	    # Fetch the commit if pin has changed
-	    git -C openwrt cat-file -e "$OPENWRT_COMMIT^{commit}" 2>/dev/null || git -C openwrt fetch origin
+fetch_source() {
+	local dir=$1 url=$2 branch=$3 commit=$4 clean_exclude=${5:-}
+	local -a clean_args=(-dffx)
+	if [ -n "$clean_exclude" ]; then
+		clean_args+=(-e "$clean_exclude")
 	fi
-	git -C openwrt checkout "$OPENWRT_COMMIT"
 
-	if [ ! -d mtk-openwrt-feeds/.git ]; then
-        rm -rf mtk-openwrt-feeds
-		git clone --branch main https://github.com/mediatek/mtk-openwrt-feeds mtk-openwrt-feeds
+	if [ ! -d "$dir/.git" ]; then
+		rm -rf "$dir"
+		git clone --single-branch --branch "$branch" "$url" "$dir"
 	else
-		git -C mtk-openwrt-feeds reset --hard HEAD
-		git -C mtk-openwrt-feeds clean -dffx
-	    git -C mtk-openwrt-feeds -e "$MTK_COMMIT^{commit}" 2>/dev/null || git -C mtk-openwrt-feeds fetch origin
+		git -C "$dir" reset --hard HEAD
+		git -C "$dir" clean "${clean_args[@]}"
+		# Fetch if the pinned commit is missing locally.
+		git -C "$dir" cat-file -e "$commit^{commit}" 2>/dev/null || git -C "$dir" fetch origin "$branch"
 	fi
-	git -C mtk-openwrt-feeds checkout "$MTK_COMMIT"
+	git -C "$dir" checkout "$commit"
+}
+
+fetch_sources() {
+	# Keep downloaded sources; remove nested feed repositories and all build state.
+	fetch_source openwrt https://github.com/openwrt/openwrt.git openwrt-25.12 "$OPENWRT_COMMIT" /dl
+	fetch_source mtk-openwrt-feeds https://github.com/mediatek/mtk-openwrt-feeds main "$MTK_COMMIT"
 }
 
 # Kernel patches for both boards go into the MTK feed, so the autobuild

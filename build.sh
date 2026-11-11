@@ -5,9 +5,9 @@
 #     board:   bpi-r4 | bpi-r4-pro-8x     (boards/<board>/board.sh)
 #     variant: standard (Wi-Fi) | wired   (boards/<board>/configs/<variant>.config)
 #
-# Run from the repository root. The OpenWrt tree is created in ./openwrt and
-# the MTK feed in ./mtk-openwrt-feeds; both are deleted first. Images end up
-# in openwrt/bin/targets/mediatek/filogic.
+# Run from the repository root. Source checkouts in ./openwrt and
+# ./mtk-openwrt-feeds are reset and cleaned first, keeping only ./openwrt/dl
+# for downloaded sources. Images end up in openwrt/bin/targets/mediatek/filogic.
 #
 # What is shared by both boards lives in common/, what is not in boards/.
 # The upstream revisions are in pins.conf.

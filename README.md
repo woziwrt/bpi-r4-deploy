@@ -468,6 +468,9 @@ cd bpi-r4-deploy
 
 The images end up in `openwrt/bin/targets/mediatek/filogic/`.
 
+Each run resets and cleans the source checkouts. Local changes in `openwrt` and `mtk-openwrt-feeds` are discarded.
+Downloaded source archives in `openwrt/dl/` are kept and reused on subsequent runs.
+
 ---
 
 ## Architecture

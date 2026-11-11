@@ -21,6 +21,12 @@ softmac_pin() {
 		echo "softmac-pin: $mk has no mp4.3-6.12 source to pin" >&2
 		exit 1
 	fi
+	# The tarball has no hash, so its name in dl/ is the only thing that keeps an
+	# older commit from being reused: the commit must be in PKG_VERSION too.
+	if ! grep -q "^PKG_VERSION:=4\.3\.6\.12~$(echo "$2" | cut -c1-8)$" "$mk"; then
+		echo "softmac-pin: $mk has no PKG_VERSION 4.3.6.12 to tag with the commit" >&2
+		exit 1
+	fi
 }
 
 softmac_pin package/kernel/mt76 "$SOFTMAC_MT76"

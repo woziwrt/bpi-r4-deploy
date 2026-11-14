@@ -136,6 +136,8 @@ Connect the WAN cable and run from the SD card:
 ```
 
 Select your **RAM (4 GB or 8 GB)**, then the file source — download from GitHub (default) or a local file in `/tmp`.
+The NAND system always gets the **wired** image (`release-*-wired`): it is only the installer for eMMC/NVMe, and the Wi-Fi image does not fit
+the 128 MB NAND next to its overlay, so it hangs at boot (#43). In local mode, put the wired `…-snand-img.bin` into `/tmp` — not the standard one.
 The board is detected from the running system: a **2.5GE PoE** board (booted from the PoE SD image) gets the PoE NAND image, with the PoE U-Boot.
 
 > ⚠️ **PoE boards:** we do not own a PoE board. A user booted the SD, NAND and NVMe images on a BPI-R4 2.5GE board

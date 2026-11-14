@@ -106,10 +106,10 @@ case "$USE_LOCAL" in
     2)
         printf "\n"
         printf "        INFO: Using local files from /tmp\n"
-        printf "        Checking files...\n"
-        EMMC_IMG="/tmp/openwrt-mediatek-filogic-bananapi_bpi-r4-emmc-img.bin"
+        printf "        Expecting: %s\n" "$EMMC_IMG"
         if [ ! -f "$EMMC_IMG" ]; then
             printf "${RED}ERROR: %s not found!${NC}\n" "$EMMC_IMG"
+            printf "       Copy it there first, e.g.: scp %s root@<router>:/tmp/\n\n" "$EMMC_NAME"
             exit 1
         fi
         printf "        OK -- file present\n\n"

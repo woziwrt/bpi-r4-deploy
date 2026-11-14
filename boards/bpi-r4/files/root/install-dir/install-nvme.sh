@@ -175,15 +175,15 @@ read USE_LOCAL
 case "$USE_LOCAL" in
     2)
         printf "\n        INFO: Using local files from /tmp\n"
-        printf "        Checking files...\n"
-        ITB="/tmp/openwrt-mediatek-filogic-bananapi_bpi-r4-squashfs-sysupgrade.itb"
-        IMG="/tmp/openwrt-mediatek-filogic-bananapi_bpi-r4-nvme-img.bin"
-        if [ ! -f "$ITB" ]; then
-            printf "${RED}ERROR: %s not found!${NC}\n" "$ITB"; exit 1
-        fi
-        if [ ! -f "$IMG" ]; then
-            printf "${RED}ERROR: %s not found!${NC}\n" "$IMG"; exit 1
-        fi
+        printf "        Expecting the files of %s:\n" "$GH_TAG"
+        printf "          %s\n          %s\n" "$ITB" "$IMG"
+        for F in "$ITB" "$IMG"; do
+            if [ ! -f "$F" ]; then
+                printf "${RED}ERROR: %s not found!${NC}\n" "$F"
+                printf "       Copy it there first, e.g.: scp %s root@<router>:/tmp/\n\n" "${F#/tmp/}"
+                exit 1
+            fi
+        done
         printf "        OK -- both files present\n\n"
         ;;
     *)

@@ -138,8 +138,10 @@ Connect the WAN cable and run from the SD card:
 Select your **RAM (4 GB or 8 GB)**, then the file source — download from GitHub (default) or a local file in `/tmp`.
 The board is detected from the running system: a **2.5GE PoE** board (booted from the PoE SD image) gets the PoE NAND image, with the PoE U-Boot.
 
-> ⚠️ **PoE boards:** the PoE NAND image and the NVMe boot from it are not tested on hardware — we do not own a PoE board.
-> If you install it, please report how it went in an [issue](https://github.com/woziwrt/bpi-r4-deploy/issues).
+> ⚠️ **PoE boards:** we do not own a PoE board. A user booted the SD, NAND and NVMe images on a BPI-R4 2.5GE board
+> ([#58](https://github.com/woziwrt/bpi-r4-deploy/issues/58)), but there `fw_printenv`/`fw_setenv` cannot reach the U-Boot
+> environment yet, so some Ethernet MAC addresses change on every boot and `install-nvme.sh` may print
+> `fw_setenv failed -- set nvme_boot manually`. #58 has the details and a possible fix.
 
 After the script finishes:
 

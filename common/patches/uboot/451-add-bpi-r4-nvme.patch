@@ -79,3 +79,13 @@
  CONFIG_PCI=y
 +CONFIG_PCIE_MEDIATEK_GEN3=y
  CONFIG_DEBUG_UART=y
+--- a/configs/mt7988a_bananapi_bpi-r4-poe-snand_defconfig
++++ b/configs/mt7988a_bananapi_bpi-r4-poe-snand_defconfig
+@@ -137,3 +137,7 @@
+ CONFIG_USB_STORAGE=y
+ CONFIG_ZSTD=y
+ CONFIG_HEXDUMP=y
++CONFIG_CMD_NVME=y
++CONFIG_NVME=y
++CONFIG_NVME_PCI=y
++CONFIG_PCIE_MEDIATEK_GEN3=y

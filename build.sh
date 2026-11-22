@@ -2,7 +2,7 @@
 # Build one board and variant:
 #
 #   ./build.sh <board> <variant>
-#     board:   bpi-r4 | bpi-r4-pro-8x     (boards/<board>/board.sh)
+#     board:   bpi-r4 | bpi-r4-pro-8x | bpi-r4-lite   (boards/<board>/board.sh)
 #     variant: standard (Wi-Fi) | wired   (boards/<board>/configs/<variant>.config)
 #
 # Run from the repository root. Source checkouts in ./openwrt and
@@ -13,7 +13,7 @@
 # The upstream revisions are in pins.conf.
 set -euo pipefail
 
-usage() { echo "usage: $0 <bpi-r4|bpi-r4-pro-8x> <standard|wired>" >&2; exit 1; }
+usage() { echo "usage: $0 <bpi-r4|bpi-r4-pro-8x|bpi-r4-lite> <standard|wired>" >&2; exit 1; }
 
 BOARD=${1:-}
 VARIANT=${2:-}

@@ -95,7 +95,10 @@ add_files() {
 }
 
 add_after_feeds() {
-	\cp "$REPO/boards/$BOARD/fit.sh" package/utils/fitblk/files/fit.sh
+	# Boards without their own fit.sh (BPI-R4 Lite) keep the upstream one.
+	if [ -f "$REPO/boards/$BOARD/fit.sh" ]; then
+		\cp "$REPO/boards/$BOARD/fit.sh" package/utils/fitblk/files/fit.sh
+	fi
 
 	\cp -r "$REPO/common/qmi.sh" package/network/utils/uqmi/files/lib/netifd/proto/
 	chmod -R 755 package/network/utils/uqmi/files/lib/netifd/proto

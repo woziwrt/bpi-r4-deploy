@@ -140,10 +140,12 @@ The NAND system always gets the **wired** image (`release-*-wired`): it is only 
 the 128 MB NAND next to its overlay, so it hangs at boot (#43). In local mode, put the wired `…-snand-img.bin` into `/tmp` — not the standard one.
 The board is detected from the running system: a **2.5GE PoE** board (booted from the PoE SD image) gets the PoE NAND image, with the PoE U-Boot.
 
-> ⚠️ **PoE boards:** we do not own a PoE board. A user booted the SD, NAND and NVMe images on a BPI-R4 2.5GE board
-> ([#58](https://github.com/woziwrt/bpi-r4-deploy/issues/58)), but there `fw_printenv`/`fw_setenv` cannot reach the U-Boot
-> environment yet, so some Ethernet MAC addresses change on every boot and `install-nvme.sh` may print
-> `fw_setenv failed -- set nvme_boot manually`. #58 has the details and a possible fix.
+> ⚠️ **PoE boards:** we do not own a PoE board. A user tested the SD, NAND and NVMe images on a BPI-R4 2.5GE board
+> ([#58](https://github.com/woziwrt/bpi-r4-deploy/issues/58)). There `fw_printenv`/`fw_setenv` cannot reach the U-Boot
+> environment, so some Ethernet MAC addresses change on every boot and `install-nvme.sh` prints
+> `fw_setenv failed -- set nvme_boot manually` (the board keeps booting from NAND until you set `nvme_boot` in the U-Boot console).
+> NVMe boot from the PoE NAND U-Boot needs a build that includes [#60](https://github.com/woziwrt/bpi-r4-deploy/pull/60)
+> (773e4ee); the PoE releases published before it have no `nvme` command in U-Boot. #58 has the details and a possible fix.
 
 After the script finishes:
 

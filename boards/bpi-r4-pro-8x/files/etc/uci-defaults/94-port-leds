@@ -1,0 +1,24 @@
+#!/bin/sh
+# Port LEDs of the two MT7988 built-in gphy ports (eth3 = switch port 0,
+# eth4 = switch port 3): link + tx/rx activity.
+#
+# Since the MTK Aeonsemi driver 2.5.3 no longer rewrites the phy_id of
+# other PHYs, these gphys bind to the "MediaTek MT7988 PHY" driver, which
+# registers their LEDs (mt7530_dsa-0:NN:green:). Without a netdev trigger
+# the LEDs stay lit and never blink. The trigger is offloaded to the PHY.
+# The MxL862xx and Aeonsemi ports are not touched.
+add_led() {
+	uci -q get "system.led_$1" >/dev/null && return
+	uci set "system.led_$1=led"
+	uci set "system.led_$1.name=$1"
+	uci set "system.led_$1.sysfs=$2"
+	uci set "system.led_$1.trigger=netdev"
+	uci set "system.led_$1.dev=$1"
+	uci add_list "system.led_$1.mode=link"
+	uci add_list "system.led_$1.mode=tx"
+	uci add_list "system.led_$1.mode=rx"
+}
+add_led eth3 'mt7530_dsa-0:00:green:'
+add_led eth4 'mt7530_dsa-0:03:green:'
+uci commit system
+exit 0

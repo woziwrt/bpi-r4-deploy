@@ -1,0 +1,12 @@
+#!/bin/sh
+# Point the port LEDs at the names the kernel registers.
+#
+# Since the MTK Aeonsemi driver 2.5.3 no longer rewrites the phy_id of
+# other PHYs, the MT7988 built-in gphys bind to the "MediaTek MT7988 PHY"
+# driver, which registers their LEDs as mt7530_dsa-0:NN:green:* (the MTK
+# switch mdio bus name). board.d still writes mt7530-0:NN:green:* (the
+# mainline bus name), so the netdev triggers (link + tx/rx, offloaded to
+# the PHY) were never attached and the LEDs stayed lit without blinking.
+# Also fixes configs kept across a sysupgrade from an older release.
+sed -i "s/'mt7530-0:/'mt7530_dsa-0:/" /etc/config/system
+exit 0

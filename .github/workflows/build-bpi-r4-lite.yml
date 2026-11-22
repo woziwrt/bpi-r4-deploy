@@ -8,6 +8,12 @@
 name: Build BPI-R4 Lite
 
 on:
+  # Until this file is on the default branch, workflow_dispatch cannot
+  # start it; a push to the Lite branch builds it instead (no inputs, so
+  # publish stays off).
+  push:
+    branches:
+      - lite-2026-11
   workflow_dispatch:
     inputs:
       repo_commit:

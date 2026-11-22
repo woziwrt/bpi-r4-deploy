@@ -41,15 +41,6 @@ fetch_sources() {
 add_kernel_patches() {
 	\cp "$REPO"/common/patches/kernel/*.patch \
 		mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12/
-
-	# MTK feed 8074fe5b (2026-11-03) replaces the Aeonsemi AS21xxx driver with
-	# v2.5.3 (as2xxxx.c). On the BPI-R4 Pro 8X the Combo LAN port (Aeonsemi PHY
-	# behind MxL862xx port 5, mxl_lan5) then gets a 1G copper link but passes no
-	# frames from the link partner (rx_packets stays 0, in and out of the bridge);
-	# the previous driver passes them. Keep the previous driver: drop the update
-	# patch. The firmware (as21x1x_fw.bin, now in package as2xxxx-firmware) and
-	# CONFIG_AS21XXX_PHY are unchanged, so nothing else has to follow.
-	rm -f mtk-openwrt-feeds/25.12/files/target/linux/mediatek/patches-6.12/999-ephy-as21xxx-02-update-driver-to-v2.5.3.patch
 }
 
 # Since MTK feed c21f3b36 mt76/mac80211/hostapd come from

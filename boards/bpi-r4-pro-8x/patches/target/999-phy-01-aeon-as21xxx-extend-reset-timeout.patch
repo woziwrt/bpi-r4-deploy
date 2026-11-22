@@ -1,6 +1,6 @@
 From: Petr Wozniak <petr.wozniak@gmail.com>
 Date: Sat, 6 Jun 2026 12:00:00 +0200
-Subject: [PATCH] net: phy: as2xxxx: extend firmware reset timeout to 30s
+Subject: [PATCH] net: phy: as21xxx: extend firmware reset timeout to 30s
 
 The AS21xxx cold-boot firmware initialisation takes 18-74 seconds
 depending on the chip variant.  aeon_wait_reset_complete() uses
@@ -20,17 +20,17 @@ there is no practical latency increase for that case.
 
 Signed-off-by: Petr Wozniak <petr.wozniak@gmail.com>
 ---
- drivers/net/phy/as2xxxx.c | 2 +-
+ drivers/net/phy/as21xxx.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
---- a/drivers/net/phy/as2xxxx.c
-+++ b/drivers/net/phy/as2xxxx.c
-@@ -2448,7 +2448,7 @@ static int aeon_wait_reset_complete(stru
+--- a/drivers/net/phy/as21xxx.c
++++ b/drivers/net/phy/as21xxx.c
+@@ -1512,7 +1512,7 @@ static int aeon_wait_reset_complete(stru
  	int val;
- 
+
  	return read_poll_timeout(aeon_ipc_get_fw_version, val,
 -				 val == 0, 10000, 2000000, false, phydev);
 +				 val == 0, 10000, 30000000, false, phydev);
  }
- 
- static int aeon_config_init(struct phy_device *phydev)
+
+ static int aeon_gen1_config_init(struct phy_device *phydev)
